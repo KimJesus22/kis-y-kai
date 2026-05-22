@@ -10,6 +10,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
 import kotlin.math.roundToInt
 
 // ----------------------------------------------------
@@ -194,39 +196,52 @@ class FoodViewModel(
         }
     }
 
+    private var isCheckingOut = false
+
     fun checkout(onComplete: (String) -> Unit) {
+        if (isCheckingOut) return
+        isCheckingOut = true
         viewModelScope.launch {
-            val cartList = cartItems.value
-            if (cartList.isEmpty()) return@launch
+            try {
+                val cartList = cartItems.value
+                if (cartList.isEmpty()) {
+                    isCheckingOut = false
+                    return@launch
+                }
 
-            val payWith = cashPayWith.value.toDoubleOrNull() ?: 0.0
-            
-            val order = repository.createOrder(
-                customerName = customerName.value.ifBlank { "Cliente Especial" },
-                phone = customerPhone.value.ifBlank { "411-XXXXXXX" },
-                deliveryMethod = deliveryMethod.value,
-                municipality = if (deliveryMethod.value == "RECOGER") "JARAL_PROGRESO" else selectedMunicipality.value,
-                address = deliveryAddress.value.ifBlank { "Dirección Conocida" },
-                paymentMethod = paymentMethod.value,
-                cashPayWith = payWith,
-                cartItems = cartList
-            )
+                val payWith = cashPayWith.value.toDoubleOrNull() ?: 0.0
+                
+                val order = repository.createOrder(
+                    customerName = customerName.value.ifBlank { "Cliente Especial" },
+                    phone = customerPhone.value.ifBlank { "411-XXXXXXX" },
+                    deliveryMethod = deliveryMethod.value,
+                    municipality = if (deliveryMethod.value == "RECOGER") "JARAL_PROGRESO" else selectedMunicipality.value,
+                    address = deliveryAddress.value.ifBlank { "Dirección Conocida" },
+                    paymentMethod = paymentMethod.value,
+                    cashPayWith = payWith,
+                    cartItems = cartList
+                )
 
-            activeOrderId.value = order.orderId
-            
-            // Push Notification
-            addNotification(
-                title = "Pedido Recibido 📝",
-                text = "¡Alitas Kis y Kei ha recibido tu orden ${order.orderId}! Iniciamos la preparación."
-            )
+                activeOrderId.value = order.orderId
+                
+                // Push Notification
+                addNotification(
+                    title = "Pedido Recibido 📝",
+                    text = "¡Alitas Kis y Kei ha recibido tu orden ${order.orderId}! Iniciamos la preparación."
+                )
 
-            // Clear Cart
-            repository.clearCart()
+                // Clear Cart
+                repository.clearCart()
 
-            // Start life cycle simulation
-            startTrackingSimulation(order.orderId)
+                // Start life cycle simulation
+                startTrackingSimulation(order.orderId)
 
-            onComplete(order.orderId)
+                withContext(Dispatchers.Main) {
+                    onComplete(order.orderId)
+                }
+            } finally {
+                isCheckingOut = false
+            }
         }
     }
 

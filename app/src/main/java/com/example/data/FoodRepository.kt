@@ -161,6 +161,16 @@ class FoodRepository(
                 success = true,
                 message = "Listo para recoger en tienda"
             )
+        } else if (municipality == "JARAL_PROGRESO") {
+            return DeliveryDetails(
+                distanceKm = 0.0,
+                deliveryFee = 0.0,
+                estimatedPrepMinutes = 15,
+                estimatedTransitMinutes = 10,
+                totalEstimatedMinutes = 25,
+                success = true,
+                message = "Envío disponible a Jaral del Progreso"
+            )
         }
 
         val dest = getDestinationCoordinates(municipality)

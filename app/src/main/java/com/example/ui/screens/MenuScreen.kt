@@ -1,10 +1,14 @@
 package com.example.ui.screens
 
+import android.content.Context
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -18,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -35,6 +40,9 @@ import com.example.ui.theme.NeonPink
 import com.example.ui.theme.NeonPinkDark
 import com.example.ui.theme.TextMuted
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private data class PromoItem(
     val title: String,
@@ -59,41 +67,65 @@ private fun SalsaChip(
 ) {
     val selectedColor = Color(0xFFFF6D00)
     val unselectedBg = Color(0xFFFCF9F8)
-    val outlineColor = if (isSelected) selectedColor else Color(0xFFE2BFB0)
+    val outlineColor = if (isSelected) selectedColor else Color(0xFFE8DED5)
 
     Card(
         modifier = modifier
+            .fillMaxWidth()
             .testTag("sauce_chip_${option.id}"),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) selectedColor else unselectedBg
         ),
-        border = androidx.compose.foundation.BorderStroke(1.dp, outlineColor)
+        border = BorderStroke(1.2.dp, outlineColor)
     ) {
         Row(
             modifier = Modifier
                 .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(
-                text = option.emoji,
-                fontSize = 15.sp
-            )
-            Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
-                    text = option.name,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isSelected) Color.White else Color(0xFF1B1C1C)
+                    text = option.emoji,
+                    fontSize = 20.sp
                 )
-                Text(
-                    text = option.label,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isSelected) Color.White.copy(alpha = 0.85f) else Color(0xFF594136).copy(alpha = 0.75f)
-                )
+                Column {
+                    Text(
+                        text = option.name,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (isSelected) Color.White else Color(0xFF111111)
+                    )
+                    Text(
+                        text = option.label,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (isSelected) Color.White.copy(alpha = 0.9f) else Color(0xFF6B5F5A)
+                    )
+                }
+            }
+
+            if (isSelected) {
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(Color.White),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Check",
+                        tint = selectedColor,
+                        modifier = Modifier.size(13.dp)
+                    )
+                }
             }
         }
     }
@@ -116,239 +148,207 @@ fun MenuScreen(
     var showDetailDialogForProduct by remember { mutableStateOf<Product?>(null) }
     var showNotificationSheet by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
+    var isFavoriteByCustomer by remember { mutableStateOf(false) }
+
+    val prefs = remember(context) { context.getSharedPreferences("food_favorites", Context.MODE_PRIVATE) }
+    var favoriteIds by remember {
+        mutableStateOf(
+            prefs.getStringSet("favorite_ids", emptySet()) ?: emptySet()
+        )
+    }
+    val favoritedProducts = remember(favoriteIds) {
+        viewModel.products.filter { it.id in favoriteIds }
+    }
 
     val totalCartCount = cartList.sumOf { it.quantity }
+    val cartSubtotal = cartList.sumOf { it.price * it.quantity }
 
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(Color(0xFFF7F3EE)) // Premium cream-claro background
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag("menu_food_list"),
+            contentPadding = PaddingValues(bottom = 150.dp) // Generous bottom space to float the bottom bar
         ) {
-            // 1. CLEAN MODERN HEADER - WHITE/CREAM WITH WARM TEXT
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
-                    .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 20.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Alitas Kis y Kei",
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.5).sp,
-                            modifier = Modifier.testTag("brand_title")
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Alitas, boneless y papas recién hechas",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Order history button
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.background)
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
-                                .clickable { showHistoryDialog = true }
-                                .testTag("history_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.History,
-                                contentDescription = "Historial de Pedidos",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-
-                        // Notification alert button styled as a clean card pill
-                        Box(
-                            modifier = Modifier
-                                .size(46.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.background)
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), CircleShape)
-                                .clickable { showNotificationSheet = !showNotificationSheet }
-                                .testTag("notification_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = if (notifications.any { !it.isRead }) Icons.Default.NotificationsActive else Icons.Default.Notifications,
-                                contentDescription = "Notifications",
-                                tint = if (notifications.any { !it.isRead }) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            if (notifications.isNotEmpty()) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .background(MaterialTheme.colorScheme.secondary, CircleShape)
-                                        .align(Alignment.TopEnd)
-                                        .padding(4.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. WARM PROMOTION BANNER IN FLUID CARDS
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .shadow(elevation = 2.dp, shape = RoundedCornerShape(24.dp)),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                )
-            ) {
-                Row(
+            // 1. PREMIUM BRAND HEADER (CREAM BACKGROUND INTEGRATED)
+            item {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .statusBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "¡Alitas y Boneless Crujientes! 🔥",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Bañados al instante con salsa BBQ, Búfalo, Mango Habanero o Lemon Pepper.",
-                            fontSize = 12.sp,
-                            color = Color.White.copy(alpha = 0.9f),
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
-            }
-
-            // Promos de hoy - Horizontal Scroll Card representation
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "PROMOS DE HOY",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
-            )
-
-            val promos = remember {
-                listOf(
-                    PromoItem(
-                        title = "Envío gratis 🛵",
-                        description = "En pedidos mayores a $250 MXN.",
-                        emoji = "🛵",
-                        infoText = "¡Ordena más de $250 pesos y tu envío es gratis! 🛵🔥"
-                    ),
-                    PromoItem(
-                        title = "Mango Habanero ☄️",
-                        description = "Recomendado: Boneless con Mango Habanero.",
-                        emoji = "☄️",
-                        infoText = "La emblemática combinación picante y dulce. ¡Agrégalos desde tu menú! 🌶️✨"
-                    ),
-                    PromoItem(
-                        title = "Combo Antojo 🍗",
-                        description = "Alitas con papas + orden de papas.",
-                        emoji = "🍗",
-                        infoText = "El dueto ideal. Pide tus alitas y papas preferidas hoy mismo. 🍗🍟"
-                    ),
-                    PromoItem(
-                        title = "Ahorra el envío 🛍️",
-                        description = "Recoge en tienda y ahorra el envío.",
-                        emoji = "🛍️",
-                        infoText = "¡Selecciona 'Recoger' al pagar para ahorrarte el envío! 🛍️"
-                    )
-                )
-            }
-
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(promos) { promo ->
-                    Card(
-                        modifier = Modifier
-                            .width(260.dp)
-                            .height(86.dp)
-                            .clickable {
-                                android.widget.Toast.makeText(context, promo.infoText, android.widget.Toast.LENGTH_LONG).show()
-                            }
-                            .testTag("promo_card_${promo.title.replace(" ", "_")}"),
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                        border = androidx.compose.foundation.BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
+                        // Custom high-fidelity circular orange badge logo
+                        Box(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                .size(62.dp)
+                                .shadow(2.dp, CircleShape)
+                                .clip(CircleShape)
+                                .background(Color.White)
+                                .border(2.5.dp, Color(0xFFFF7A00), CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(46.dp)
-                                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f), CircleShape)
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.15f), CircleShape),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = promo.emoji,
-                                    fontSize = 20.sp
-                                )
-                            }
                             Column(
-                                modifier = Modifier.weight(1f),
+                                horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center
                             ) {
                                 Text(
-                                    text = promo.title,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    text = "🍗",
+                                    fontSize = 14.sp
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = promo.description,
+                                    text = "KIS y KEI",
+                                    fontSize = 7.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color(0xFF1B1B1B),
+                                    lineHeight = 8.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                                Text(
+                                    text = "ALITAS",
+                                    fontSize = 5.5.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFF7A00),
+                                    lineHeight = 6.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Branding text details
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Alitas Kis y Kei",
+                                color = Color(0xFF1B1B1B), // Dark text to stand out premiumly
+                                fontSize = 23.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = (-0.5).sp,
+                                modifier = Modifier.testTag("brand_title")
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Alitas, boneless y papas recién hechas",
+                                color = Color(0xFF6B6B6B),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            
+                            // Delivery details & ratings row mimicking DiDi Food exactly
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = "Rating",
+                                    tint = Color(0xFFFFB300),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = "4.8 (230+)",
                                     fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 14.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1B1B1B)
+                                )
+                                Text(text = "•", color = Color(0xFF8C847E), fontSize = 11.sp)
+                                Text(
+                                    text = "🛵 25–35 min",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF6B6B6B)
+                                )
+                                Text(text = "•", color = Color(0xFF8C847E), fontSize = 11.sp)
+                                Text(
+                                    text = "Abierto",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2E7D32)
+                                )
+                            }
+                        }
+
+                        // Circular buttons stacked next to the right side of the header
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // Circular History Order button
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .shadow(elevation = 1.dp, shape = CircleShape)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .clickable { showHistoryDialog = true }
+                                    .testTag("history_button"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.History,
+                                    contentDescription = "Historial de Pedidos",
+                                    tint = Color(0xFF6B6B6B),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+
+                            // Notification alert button with red status dot matching picture
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .shadow(elevation = 1.dp, shape = CircleShape)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .clickable { showNotificationSheet = true }
+                                    .testTag("notification_button"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (notifications.any { !it.isRead }) Icons.Default.NotificationsActive else Icons.Default.Notifications,
+                                    contentDescription = "Notifications",
+                                    tint = if (notifications.any { !it.isRead }) Color(0xFFFF5100) else Color(0xFF6B6B6B),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                if (notifications.isNotEmpty()) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(7.dp)
+                                            .background(Color(0xFFFF5100), CircleShape)
+                                            .align(Alignment.TopEnd)
+                                    )
+                                }
+                            }
+
+                            // Favorite Button
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .shadow(elevation = 1.dp, shape = CircleShape)
+                                    .clip(CircleShape)
+                                    .background(Color.White)
+                                    .clickable {
+                                        isFavoriteByCustomer = !isFavoriteByCustomer
+                                        val favMsg = if (isFavoriteByCustomer) "¡Agregado a tus favoritos! ❤️" else "Eliminado de tus favoritos"
+                                        android.widget.Toast.makeText(context, favMsg, android.widget.Toast.LENGTH_SHORT).show()
+                                    }
+                                    .testTag("favorite_button"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = if (isFavoriteByCustomer) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = "Favorito",
+                                    tint = if (isFavoriteByCustomer) Color(0xFFE53935) else Color(0xFF6B6B6B),
+                                    modifier = Modifier.size(18.dp)
                                 )
                             }
                         }
@@ -356,29 +356,268 @@ fun MenuScreen(
                 }
             }
 
-            // 3. MENU SECTION LABEL
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = "NUESTRO MENÚ REAL",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.5.sp,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp)
-            )
+            // 2. LARGE ORANGE PROMO BANNER with styled food illustration
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .shadow(elevation = 3.dp, shape = RoundedCornerShape(24.dp)),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(Color(0xFFFF8A00), Color(0xFFFF5200))
+                                )
+                            )
+                            .padding(20.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1.1f)) {
+                                Text(
+                                    text = "¡Alitas y Boneless Crujientes! 🔥",
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Bañados al instante con salsa BBQ, Búfalo, Mango Habanero o Lemon Pepper.",
+                                    fontSize = 11.sp,
+                                    color = Color.White.copy(alpha = 0.95f),
+                                    lineHeight = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(8.dp))
+                            
+                            // High quality double-bubble illustrative display representing wings and fries
+                            Box(
+                                modifier = Modifier
+                                    .size(76.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .border(1.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "🍗🍟✨",
+                                    fontSize = 32.sp,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
-            // 4. MAIN LIST (STRICTLY FEEDING THE 4 REAL PRODUCTS)
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .testTag("menu_food_list"),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 100.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                items(viewModel.products) { product ->
+            // Promos Slider Row (Mini Cards)
+            item {
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "PROMOS DE HOY",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.5.sp,
+                    color = Color(0xFFFF6D00),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp)
+                )
+
+                val promos = remember {
+                    listOf(
+                        PromoItem(
+                            title = "Envío gratis 🛵",
+                            description = "En pedidos mayores a $250 MXN.",
+                            emoji = "🛵",
+                            infoText = "¡Ordena más de $250 pesos y tu envío es gratis! 🛵"
+                        ),
+                        PromoItem(
+                            title = "Mango Habanero ☄️",
+                            description = "Prueba delicioso Boneless con Mango Habanero.",
+                            emoji = "☄️",
+                            infoText = "La mejor combinación picante y dulce. ¡Agrégalos en el menú! +🌶️"
+                        ),
+                        PromoItem(
+                            title = "Combo Antojo 🍗",
+                            description = "Alitas con papas + orden de papas fritas.",
+                            emoji = "🍗",
+                            infoText = "El dúo ideal para hoy. ¡Añade tus favoritos! 🍗🍟"
+                        ),
+                        PromoItem(
+                            title = "Recoge en local 🛍️",
+                            description = "Selecciona Recoger al pagar y ahorra el envío.",
+                            emoji = "🛍️",
+                            infoText = "¡Selecciona 'Recoger' al pagar para ahorrarte el envío! 🛍️"
+                        )
+                    )
+                }
+
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(promos) { promo ->
+                        Card(
+                            modifier = Modifier
+                                .width(220.dp)
+                                .height(78.dp)
+                                .clickable {
+                                    android.widget.Toast.makeText(context, promo.infoText, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                                .testTag("promo_card_${promo.title.replace(" ", "_")}"),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            border = BorderStroke(
+                                1.dp,
+                                Color(0xFFE8DED5)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(Color(0xFFFF8A00).copy(alpha = 0.08f), CircleShape)
+                                        .border(1.dp, Color(0xFFFF8A00).copy(alpha = 0.15f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = promo.emoji,
+                                        fontSize = 16.sp
+                                    )
+                                }
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = promo.title,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1B1B1B),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(1.dp))
+                                    Text(
+                                        text = promo.description,
+                                        fontSize = 10.sp,
+                                        color = Color(0xFF7A6B5E),
+                                        lineHeight = 12.sp,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 3. SECCIÓN "NUESTRO MENÚ" LABELED HEADER WITH FORK ICON
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFF7A00)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🍴",
+                            fontSize = 11.sp,
+                            color = Color.White
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Nuestro menú",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF1B1B1B)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(1.dp)
+                            .background(Color(0xFFE8DED5))
+                    )
+                }
+            }
+
+            // 3.5 SECCIÓN "TUS FAVORITOS" (Opcional, si hay productos marcados)
+            if (favoritedProducts.isNotEmpty()) {
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFFFECEB)), // Suave rosa-rojo para el fondo del corazón
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Tus Favoritos",
+                                tint = Color(0xFFE53935),
+                                modifier = Modifier.size(13.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Tus favoritos",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF1B1B1B)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(1.dp)
+                                .background(Color(0xFFE8DED5))
+                        )
+                    }
+                }
+
+                items(favoritedProducts) { product ->
                     FoodListItem(
                         product = product,
+                        isFavorite = true,
+                        onFavoriteToggle = {
+                            val newFavorites = favoriteIds - product.id
+                            favoriteIds = newFavorites
+                            prefs.edit().putStringSet("favorite_ids", newFavorites).apply()
+                        },
                         onClick = {
                             showDetailDialogForProduct = product
                             viewModel.selectedItemQuantity.value = 1
@@ -388,102 +627,179 @@ fun MenuScreen(
                     )
                 }
             }
+
+            // 4. VERTICAL PRODUCT LIST (Strictly showing original 4 products)
+            items(viewModel.products) { product ->
+                val isFav = product.id in favoriteIds
+                FoodListItem(
+                    product = product,
+                    isFavorite = isFav,
+                    onFavoriteToggle = {
+                        val newFavorites = if (isFav) {
+                            favoriteIds - product.id
+                        } else {
+                            favoriteIds + product.id
+                        }
+                        favoriteIds = newFavorites
+                        prefs.edit().putStringSet("favorite_ids", newFavorites).apply()
+                    },
+                    onClick = {
+                        showDetailDialogForProduct = product
+                        viewModel.selectedItemQuantity.value = 1
+                        viewModel.selectedItemSauce.value = "BBQ"
+                        viewModel.selectedItemNote.value = ""
+                    }
+                )
+            }
         }
 
-        // 5. FLOATING PILL ACTION BAR FOR NAVIGATION
+        // 5. STICKY COLLAPSIBLE checkout pill floating at the very bottom
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Tracking Active Order Alert Bar floating just above checkout
                 if (activeOrderId != null) {
-                    Button(
-                        onClick = onNavigateToTracking,
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .testTag("floating_track_button"),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
-                        shape = CircleShape,
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .height(44.dp)
+                            .shadow(2.dp, CircleShape)
+                            .clip(CircleShape)
+                            .background(Color(0xFF2E7D32)) // Warm forest green
+                            .border(1.dp, Color(0xFFC8E6C9), CircleShape)
+                            .clickable(onClick = onNavigateToTracking)
+                            .padding(horizontal = 16.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                            modifier = Modifier.fillMaxWidth()
+                            horizontalArrangement = Arrangement.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.DirectionsRun,
-                                contentDescription = "Rastreo",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
+                            Text(
+                                text = "🛵",
+                                fontSize = 14.sp
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Mi Rastrero",
+                                text = "¡Tienes un pedido activo! Síguelo aquí en tiempo real ⚡",
                                 color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black
                             )
                         }
                     }
                 }
 
-                Button(
-                    onClick = onNavigateToCart,
+                // Styled shopping cart checkout sticky bar
+                Card(
                     modifier = Modifier
-                        .weight(1.4f)
-                        .height(56.dp)
+                        .fillMaxWidth()
+                        .height(64.dp)
+                        .shadow(elevation = 6.dp, shape = RoundedCornerShape(24.dp))
+                        .clickable { onNavigateToCart() }
                         .testTag("floating_cart_button"),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (totalCartCount > 0) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.primary
-                    ),
-                    shape = CircleShape,
-                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
-                    enabled = totalCartCount > 0
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFF7A00)) // Strong bright orange
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        // White circle bag container
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color.White),
+                            contentAlignment = Alignment.Center
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.ShoppingBag,
                                 contentDescription = "Carrito",
-                                tint = Color.White,
+                                tint = Color(0xFFFF7A00),
                                 modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = if (totalCartCount > 0) "Ver Carrito" else "Carrito Vacío",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.sp
                             )
                         }
 
-                        if (totalCartCount > 0) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(Color.White)
-                                    .padding(horizontal = 10.dp, vertical = 4.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Items indicator and dynamic label
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
-                                    text = "$totalCartCount",
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black
+                                    text = "Carrito",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 15.sp
                                 )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                // White rounded count badge
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(Color.White)
+                                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "$totalCartCount",
+                                        color = Color(0xFFFF7A00),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
                             }
+                            Text(
+                                text = if (totalCartCount > 0) {
+                                    "Total: $${cartSubtotal.toInt()} MXN"
+                                } else {
+                                    "Agrega productos a tu pedido"
+                                },
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+
+                        // Fine divider line
+                        Box(
+                            modifier = Modifier
+                                .width(1.dp)
+                                .height(24.dp)
+                                .background(Color.White.copy(alpha = 0.4f))
+                        )
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        // Checkout CTA Label text
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = "Ver pedido",
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.Default.ChevronRight,
+                                contentDescription = "Ver pedido",
+                                tint = Color.White,
+                                modifier = Modifier.size(16.dp)
+                            )
                         }
                     }
                 }
@@ -491,9 +807,9 @@ fun MenuScreen(
         }
 
         // 6. ACTION SHEETS & DIALOGS
-        // Order History Modal Dialog
+        // Order History Dialog
         if (showHistoryDialog) {
-            val dateFormater = remember { java.text.SimpleDateFormat("dd/MM/yyyy hh:mm a", java.util.Locale.getDefault()) }
+            val dateFormater = remember { SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()) }
             Dialog(onDismissRequest = { showHistoryDialog = false }) {
                 Card(
                     modifier = Modifier
@@ -501,7 +817,8 @@ fun MenuScreen(
                         .fillMaxHeight(0.85f)
                         .padding(horizontal = 4.dp),
                     shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE8DED5))
                 ) {
                     Column(
                         modifier = Modifier
@@ -517,27 +834,27 @@ fun MenuScreen(
                                 Icon(
                                     imageVector = Icons.Default.History,
                                     contentDescription = "Historial",
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = Color(0xFFFF7A00)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Mis Pedidos Anteriores",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = Color(0xFF1B1B1B)
                                 )
                             }
                             IconButton(onClick = { showHistoryDialog = false }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Cerrar",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = Color(0xFF6B6B6B)
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(10.dp))
-                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                        HorizontalDivider(color = Color(0xFFE8DED5))
                         Spacer(modifier = Modifier.height(10.dp))
 
                         if (allOrders.isEmpty()) {
@@ -565,13 +882,12 @@ fun MenuScreen(
                                 items(allOrders) { ord ->
                                     val formattedDate = remember(ord.timestamp) {
                                         try {
-                                            dateFormater.format(java.util.Date(ord.timestamp))
+                                            dateFormater.format(Date(ord.timestamp))
                                         } catch (e: Exception) {
                                             "Fecha desconocida"
                                         }
                                     }
                                     
-                                    // Calculate subtotal
                                     val subtotal = remember(ord.itemsJson) {
                                         var totalSum = 0.0
                                         try {
@@ -584,8 +900,8 @@ fun MenuScreen(
                                                     totalSum += priceNum
                                                 }
                                             }
-                                        } catch (e: java.lang.Exception) {
-                                            // fallback parsing
+                                        } catch (e: Exception) {
+                                            // fallback
                                         }
                                         if (totalSum <= 0.0) 120.0 else totalSum
                                     }
@@ -596,11 +912,11 @@ fun MenuScreen(
                                             .fillMaxWidth()
                                             .border(
                                                 1.dp,
-                                                MaterialTheme.colorScheme.outline.copy(alpha = 0.15f),
+                                                Color(0xFFE8DED5),
                                                 RoundedCornerShape(16.dp)
                                             ),
                                         shape = RoundedCornerShape(16.dp),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background)
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFCF9F8))
                                     ) {
                                         Column(modifier = Modifier.padding(14.dp)) {
                                             Row(
@@ -612,16 +928,15 @@ fun MenuScreen(
                                                     text = ord.orderId,
                                                     fontWeight = FontWeight.Bold,
                                                     fontSize = 15.sp,
-                                                    color = MaterialTheme.colorScheme.primary
+                                                    color = Color(0xFFFF7A00)
                                                 )
                                                 
-                                                // Simplified localized Spanish Status labels
                                                 val statusColor = when (ord.status) {
                                                     "ENTREGADO" -> Color(0xFF2E7D32)
                                                     "LISTO" -> Color(0xFF00796B)
                                                     "EN_CAMINO" -> Color(0xFF1565C0)
                                                     "PREPARANDO" -> Color(0xFFE65100)
-                                                    else -> MaterialTheme.colorScheme.secondary
+                                                    else -> Color(0xFFFF7A00)
                                                 }
                                                 val statusLabel = when (ord.status) {
                                                     "ENTREGADO" -> "Entregado ✅"
@@ -648,22 +963,21 @@ fun MenuScreen(
                                                 Icon(
                                                     imageVector = Icons.Default.Schedule,
                                                     contentDescription = "Fecha",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    tint = Color(0xFF6B6B6B),
                                                     modifier = Modifier.size(14.dp)
                                                 )
                                                 Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
                                                     text = formattedDate,
                                                     fontSize = 12.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    color = Color(0xFF6B6B6B)
                                                 )
                                             }
 
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                            HorizontalDivider(color = Color(0xFFE8DED5))
                                             Spacer(modifier = Modifier.height(8.dp))
 
-                                            // Item lines list representation
                                             val itemsList = remember(ord.itemsJson) {
                                                 ord.itemsJson.split("; ").filter { it.isNotBlank() }
                                             }
@@ -671,13 +985,13 @@ fun MenuScreen(
                                                 Text(
                                                     text = "• $line",
                                                     fontSize = 12.sp,
-                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    color = Color(0xFF1B1B1B),
                                                     modifier = Modifier.padding(vertical = 1.dp)
                                                 )
                                             }
 
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.1f))
+                                            HorizontalDivider(color = Color(0xFFE8DED5))
                                             Spacer(modifier = Modifier.height(8.dp))
 
                                             Row(
@@ -689,18 +1003,18 @@ fun MenuScreen(
                                                     Text(
                                                         text = "Envío: $${ord.deliveryFee.toInt()} | Subtotal: $${subtotal.toInt()}",
                                                         fontSize = 11.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        color = Color(0xFF6B6B6B)
                                                     )
                                                     Text(
                                                         text = "Pagas en: ${if (ord.paymentMethod == "EFECTIVO") "Efectivo" else "Transferencia"}",
                                                         fontSize = 11.sp,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        color = Color(0xFF6B6B6B)
                                                     )
                                                     Text(
                                                         text = "Total: $${orderTotalCost.toInt()} MXN",
                                                         fontWeight = FontWeight.Black,
                                                         fontSize = 14.sp,
-                                                        color = MaterialTheme.colorScheme.onSurface
+                                                        color = Color(0xFF1B1B1B)
                                                     )
                                                 }
 
@@ -708,10 +1022,9 @@ fun MenuScreen(
                                                     onClick = {
                                                         viewModel.repeatOrder(ord) {
                                                             showHistoryDialog = false
-                                                            // Provide visual sound toast
                                                             android.widget.Toast.makeText(
                                                                 context, 
-                                                                "¡Pedido repetido con éxito! Navegando al carrito... 🛒", 
+                                                                "¡Pedido repetido! Revisa tu carrito... 🛒", 
                                                                 android.widget.Toast.LENGTH_LONG
                                                             ).show()
                                                             onNavigateToCart()
@@ -719,8 +1032,8 @@ fun MenuScreen(
                                                     },
                                                     shape = RoundedCornerShape(12.dp),
                                                     colors = ButtonDefaults.buttonColors(
-                                                        containerColor = MaterialTheme.colorScheme.primaryContainer,
-                                                        contentColor = MaterialTheme.colorScheme.primary
+                                                        containerColor = Color(0xFFFF8A00).copy(alpha = 0.08f),
+                                                        contentColor = Color(0xFFFF7A00)
                                                     ),
                                                     contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                                     modifier = Modifier.height(36.dp).testTag("repeat_order_button_${ord.orderId}")
@@ -750,7 +1063,7 @@ fun MenuScreen(
             }
         }
 
-        // Product Customization Dialog
+        // Product Customization Dialog (Preserves salsas, note special & add callbacks)
         showDetailDialogForProduct?.let { product ->
             FoodCustomizerDialog(
                 product = product,
@@ -758,12 +1071,12 @@ fun MenuScreen(
                 onDismiss = { showDetailDialogForProduct = null },
                 onAddConfirmed = {
                     showDetailDialogForProduct = null
-                    android.widget.Toast.makeText(context, "¡Añadido al carrito con éxito! 🛒", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, "¡Añadido con éxito! 🛒", android.widget.Toast.LENGTH_SHORT).show()
                 }
             )
         }
 
-        // Notifications Modal Dialog
+        // Alerts Dialog Custom Sheet
         if (showNotificationSheet) {
             Dialog(onDismissRequest = { showNotificationSheet = false }) {
                 Card(
@@ -772,7 +1085,8 @@ fun MenuScreen(
                         .padding(horizontal = 8.dp)
                         .height(420.dp),
                     shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    border = BorderStroke(1.dp, Color(0xFFE8DED5))
                 ) {
                     Column(
                         modifier = Modifier
@@ -788,27 +1102,27 @@ fun MenuScreen(
                                 Icon(
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = "Notificaciones",
-                                    tint = MaterialTheme.colorScheme.primary
+                                    tint = Color(0xFFFF7A00)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "Alertas de Pedido",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = Color(0xFF1B1B1B)
                                 )
                             }
                             IconButton(onClick = { showNotificationSheet = false }) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Cerrar",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    tint = Color(0xFF6B6B6B)
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(12.dp))
-                        Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                        HorizontalDivider(color = Color(0xFFE8DED5))
                         Spacer(modifier = Modifier.height(12.dp))
 
                         if (notifications.isEmpty()) {
@@ -822,7 +1136,7 @@ fun MenuScreen(
                                     Icon(
                                         imageVector = Icons.Default.Info,
                                         contentDescription = "Vacías",
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        tint = Color(0xFF6B6B6B).copy(alpha = 0.5f),
                                         modifier = Modifier.size(48.dp)
                                     )
                                     Spacer(modifier = Modifier.height(12.dp))
@@ -843,8 +1157,8 @@ fun MenuScreen(
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(16.dp)),
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.background),
+                                            .border(1.dp, Color(0xFFE8DED5), RoundedCornerShape(16.dp)),
+                                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFCF9F8)),
                                         shape = RoundedCornerShape(16.dp)
                                     ) {
                                         Column(modifier = Modifier.padding(14.dp)) {
@@ -857,13 +1171,13 @@ fun MenuScreen(
                                                     text = notif.title,
                                                     fontSize = 13.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                    color = Color(0xFF1B1B1B),
                                                     modifier = Modifier.weight(1f)
                                                 )
                                                 Text(
                                                     text = notif.time,
                                                     fontSize = 10.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    color = Color(0xFF6B6B6B),
                                                     textAlign = TextAlign.End
                                                 )
                                             }
@@ -871,7 +1185,7 @@ fun MenuScreen(
                                             Text(
                                                 text = notif.text,
                                                 fontSize = 11.sp,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                color = Color(0xFF6B6B6B),
                                                 lineHeight = 15.sp
                                             )
                                         }
@@ -889,82 +1203,85 @@ fun MenuScreen(
 @Composable
 fun FoodListItem(
     product: Product,
+    isFavorite: Boolean,
+    onFavoriteToggle: () -> Unit,
     onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(elevation = 2.dp, shape = RoundedCornerShape(24.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .shadow(elevation = 1.dp, shape = RoundedCornerShape(20.dp))
+            .border(BorderStroke(1.dp, Color(0xFFE8DED5)), RoundedCornerShape(20.dp)) // Fine border matching picture
             .clickable(onClick = onClick)
             .testTag("food_card_${product.id}"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        shape = RoundedCornerShape(24.dp)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Food emoji box matching the warm design with outline accents
+            // Food emoji box with premium padding of 80x80 dp which displays beautiful large emojis
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(80.dp)
                     .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.background)
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                    .background(Color(0xFFF7F3EE))
+                    .border(1.dp, Color(0xFFE8DED5), RoundedCornerShape(16.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = when (product.id) {
-                        "alitas_papas" -> "🪶🍟"
+                        "alitas_papas" -> "🍗🍟"
                         "boneless" -> "🍗"
-                        "boneless_papas" -> "🍗🍟"
+                        "boneless_papas" -> "🍖🍟"
                         "papas_orden" -> "🍟"
-                        else -> "🍽"
+                        else -> "🍽️"
                     },
-                    fontSize = 32.sp
+                    fontSize = 36.sp
                 )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
                     text = product.name,
-                    fontSize = 16.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = Color(0xFF1B1B1B),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = product.description,
                     fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = Color(0xFF6B6B6B),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    lineHeight = 15.sp
+                    lineHeight = 14.sp
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "$${product.price.toInt()}",
-                        fontSize = 18.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary
+                        color = Color(0xFFFF7A00) // Vibrant orange pricing text
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = "MXN",
                         fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = Color(0xFF8C847E),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -972,18 +1289,36 @@ fun FoodListItem(
 
             Spacer(modifier = Modifier.width(8.dp))
 
-            // Custom modern circle plus button with primary color scheme
+            // Botón de Corazón (Favorito)
+            IconButton(
+                onClick = onFavoriteToggle,
+                modifier = Modifier
+                    .size(36.dp)
+                    .testTag("favorite_toggle_${product.id}")
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    contentDescription = "Toggle Favorito",
+                    tint = if (isFavorite) Color(0xFFE53935) else Color(0xFF8C847E),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            // Premium circular orange Plus floating action button
             Box(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                    .background(Color(0xFFFF7A00))
+                    .shadow(1.dp, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "Añadir al carrito",
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -1003,188 +1338,362 @@ fun FoodCustomizerDialog(
     val sauce by viewModel.selectedItemSauce.collectAsState()
     val note by viewModel.selectedItemNote.collectAsState()
     val scope = rememberCoroutineScope()
+    val scrollState = androidx.compose.foundation.rememberScrollState()
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            usePlatformDefaultWidth = false
+        )
+    ) {
         Card(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp)
-                .shadow(elevation = 4.dp, shape = RoundedCornerShape(28.dp)),
+                .fillMaxWidth(0.96f)
+                .fillMaxHeight(0.92f)
+                .shadow(elevation = 8.dp, shape = RoundedCornerShape(28.dp))
+                .border(BorderStroke(1.dp, Color(0xFFE8DED5)), RoundedCornerShape(28.dp)),
             shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F3EE))
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
+                modifier = Modifier.fillMaxSize()
             ) {
-                Text(
-                    text = "Añadir al Pedido",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
-                    letterSpacing = 1.sp
-                )
-                Text(
-                    text = product.name,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                Text(
-                    text = product.description,
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 4.dp),
-                    lineHeight = 16.sp
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Quantity selector block styled with soft round capsules
-                Text(
-                    text = "Cantidad:",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                // 1. Drag Handle
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                Box(
+                    modifier = Modifier
+                        .size(width = 38.dp, height = 4.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFCEBFB3))
+                        .align(Alignment.CenterHorizontally)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // 2. Centered visual header with close button left
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.CenterStart
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
+                    Box(
                         modifier = Modifier
-                            .background(MaterialTheme.colorScheme.background, CircleShape)
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape)
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .size(36.dp)
+                            .shadow(elevation = 1.dp, shape = CircleShape)
+                            .clip(CircleShape)
+                            .background(Color.White)
+                            .clickable { onDismiss() }
+                            .testTag("dialog_dismiss_customizer"),
+                        contentAlignment = Alignment.Center
                     ) {
-                        IconButton(
-                            onClick = { if (quantity > 1) viewModel.selectedItemQuantity.value = quantity - 1 },
-                            modifier = Modifier.size(32.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Remove,
-                                contentDescription = "Menos",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = Color(0xFF1B1B1B),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "Añadir al pedido",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Black,
+                        color = Color(0xFF111111),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                // Scrollable container with rounded top borders
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .background(Color.White, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .verticalScroll(scrollState)
+                        .padding(bottom = 24.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // 3. PRODUCT HERO GRAPHIC
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(190.dp)
+                            .padding(horizontal = 16.dp)
+                            .clip(RoundedCornerShape(24.dp))
+                            .background(
+                                brush = Brush.linearGradient(
+                                    colors = listOf(Color(0xFFFFFAF5), Color(0xFFFCEFE3))
+                                )
                             )
+                            .border(1.dp, Color(0xFFE8DED5), RoundedCornerShape(24.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(94.dp)
+                                    .shadow(elevation = 2.dp, shape = CircleShape)
+                                    .clip(CircleShape)
+                                    .background(Color.White),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = when (product.id) {
+                                        "alitas_papas" -> "🍗🍟"
+                                        "boneless" -> "🍗"
+                                        "boneless_papas" -> "🍖🍟"
+                                        "papas_orden" -> "🍟"
+                                        else -> "🍽️"
+                                    },
+                                    fontSize = 44.sp
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = "Alitas Kis y Kei • Sabor Fresh",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF9E7E6E),
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+
+                    // 4. TITLES & DESCRIPTION
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 20.dp)
+                    ) {
+                        Text(
+                            text = product.name,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF111111),
+                            lineHeight = 26.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = product.description,
+                            fontSize = 13.sp,
+                            color = Color(0xFF5F5F5F),
+                            lineHeight = 17.sp
+                        )
+                    }
+
+                    // 5. QUANTITY & PRICE ROW
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(Color(0xFFFFF7F2))
+                                .border(BorderStroke(1.2.dp, Color(0xFFFFD1B3)), CircleShape)
+                                .padding(horizontal = 4.dp, vertical = 3.dp)
+                        ) {
+                            IconButton(
+                                onClick = { if (quantity > 1) viewModel.selectedItemQuantity.value = quantity - 1 },
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Remove,
+                                    contentDescription = "Menos",
+                                    tint = Color(0xFFFF7A00),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+
+                            Text(
+                                text = "$quantity",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF111111),
+                                modifier = Modifier
+                                    .padding(horizontal = 14.dp)
+                                    .testTag("dialog_qty")
+                            )
+
+                            IconButton(
+                                onClick = { if (quantity < 10) viewModel.selectedItemQuantity.value = quantity + 1 },
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Más",
+                                    tint = Color(0xFFFF7A00),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
 
                         Text(
-                            text = "$quantity",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier
-                                .padding(horizontal = 12.dp)
-                                .testTag("dialog_qty")
+                            text = "$${(product.price * quantity).toInt()} MXN",
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFFF7A00)
                         )
+                    }
 
-                        IconButton(
-                            onClick = { if (quantity < 10) viewModel.selectedItemQuantity.value = quantity + 1 },
-                            modifier = Modifier.size(32.dp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    HorizontalDivider(
+                        color = Color(0xFFE8DED5),
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+
+                    // 6. ELIGE TU SALSA
+                    if (product.hasSauces) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 18.dp)
+                        ) {
+                            Text(
+                                text = "Elige tu salsa",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF111111)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            val sauceOptions = remember {
+                                listOf(
+                                    SalsaOption("BBQ", "BBQ", "Suave 🌶️", "🍖"),
+                                    SalsaOption("Buffalo", "Búfalo", "Medio 🌶️🌶️", "🌶️"),
+                                    SalsaOption("Mango Habanero", "Mango Habanero", "Picante 🌶️🌶️🌶️", "🥭"),
+                                    SalsaOption("Lemon Pepper", "Lemon Pepper", "Suave / Cítrica 🌶️", "🍋"),
+                                    SalsaOption("Natural (Sin salsa)", "Natural", "Sin picante", "✨")
+                                )
+                            }
+
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                sauceOptions.forEach { opt ->
+                                    val isSelected = sauce == opt.id
+                                    SalsaChip(
+                                        option = opt,
+                                        isSelected = isSelected,
+                                        onClick = { viewModel.selectedItemSauce.value = opt.id }
+                                    )
+                                }
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = Color(0xFFE8DED5),
+                            modifier = Modifier.padding(horizontal = 20.dp)
+                        )
+                    }
+
+                    // 7. NOTA ESPECIAL
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 20.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = "Más",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(16.dp)
+                                imageVector = Icons.Default.EditNote,
+                                contentDescription = "Notas",
+                                tint = Color(0xFFFF7A00),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Nota especial (Salsas extra, indicaciones)",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0xFF111111)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        val maxChars = 120
+                        if (note != null) {
+                            OutlinedTextField(
+                                value = note,
+                                onValueChange = {
+                                    if (it.length <= maxChars) {
+                                        viewModel.selectedItemNote.value = it
+                                    }
+                                },
+                                placeholder = {
+                                    Text(
+                                        text = "Ej. Aderezo ranch extra, papas bien doraditas...",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFF5F5F5F).copy(alpha = 0.6f)
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("note_input"),
+                                shape = RoundedCornerShape(16.dp),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = Color(0xFFFCF9F8),
+                                    unfocusedContainerColor = Color(0xFFFCF9F8),
+                                    focusedBorderColor = Color(0xFFFF7A00),
+                                    unfocusedBorderColor = Color(0xFFE8DED5),
+                                    focusedTextColor = Color(0xFF111111),
+                                    unfocusedTextColor = Color(0xFF111111)
+                                ),
+                                supportingText = {
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Text(
+                                            text = "${note.length}/$maxChars",
+                                            fontSize = 10.sp,
+                                            color = Color(0xFF5F5F5F)
+                                        )
+                                    }
+                                }
                             )
                         }
                     }
-
-                    Spacer(modifier = Modifier.weight(1f))
-                    
-                    Text(
-                        text = "$${(product.price * quantity).toInt()} MXN",
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                 }
 
-                if (product.hasSauces) {
-                    Spacer(modifier = Modifier.height(18.dp))
-                    Text(
-                        text = "Elige tu salsa:",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val sauceOptions = remember {
-                        listOf(
-                            SalsaOption("BBQ", "BBQ", "Dulce", "🍖"),
-                            SalsaOption("Buffalo", "Búfalo", "Picante", "🌶️"),
-                            SalsaOption("Mango Habanero", "Mango Habanero", "Dulce/Picosa", "🥭"),
-                            SalsaOption("Lemon Pepper", "Lemon Pepper", "Cítrica", "🍋"),
-                            SalsaOption("Natural (Sin salsa)", "Natural", "Suave", "✨")
-                        )
-                    }
-
-                    FlowRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        sauceOptions.forEach { opt ->
-                            val isSelected = sauce == opt.id
-                            SalsaChip(
-                                option = opt,
-                                isSelected = isSelected,
-                                onClick = { viewModel.selectedItemSauce.value = opt.id }
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(18.dp))
-                Text(
-                    text = "Nota especial (Salsas extra, indicaciones):",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                OutlinedTextField(
-                    value = note,
-                    onValueChange = { viewModel.selectedItemNote.value = it },
-                    placeholder = { Text("Ej. Aderezo ranch extra, papas bien doraditas...", fontSize = 12.sp, color = TextMuted.copy(alpha = 0.7f)) },
+                // 8. FIXED BOTTOM CONTROL ACTION BAR
+                HorizontalDivider(color = Color(0xFFE8DED5))
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("note_input"),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    )
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        .background(Color.White)
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
                         onClick = onDismiss,
                         modifier = Modifier
-                            .weight(1f)
-                            .height(50.dp),
+                            .weight(1.5f)
+                            .height(52.dp),
                         shape = CircleShape,
                         colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.primary
+                            contentColor = Color(0xFFFF7A00),
+                            containerColor = Color(0xFFFFF7F2)
                         ),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                        border = BorderStroke(1.2.dp, Color(0xFFFF7A00))
                     ) {
-                        Text("Cancelar", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Cancelar",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
                     }
 
                     Button(
@@ -1195,13 +1704,31 @@ fun FoodCustomizerDialog(
                             onAddConfirmed()
                         },
                         modifier = Modifier
-                            .weight(1.5f)
-                            .height(50.dp)
+                            .weight(2f)
+                            .height(52.dp)
                             .testTag("dialog_confirm_add"),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                        shape = CircleShape
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF7A00)),
+                        shape = CircleShape,
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                     ) {
-                        Text("Añadir", color = Color.White, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ShoppingBag,
+                                contentDescription = "Bolsa",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Añadir al pedido",
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
                 }
             }

@@ -7,10 +7,12 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -32,13 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.OrderEntity
 import com.example.ui.FoodViewModel
 import com.example.ui.components.CourierMapCanvas
-import com.example.ui.components.EmptyStateContent
-import com.example.ui.theme.ElectricBlue
-import com.example.ui.theme.FreshGreen
-import com.example.ui.theme.HoneyGold
-import com.example.ui.theme.NeonPink
-import com.example.ui.theme.TextMuted
-import com.example.ui.theme.WarningOrange
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +47,16 @@ fun TrackingScreen(
     val order by viewModel.activeOrder.collectAsState()
     val context = LocalContext.current
     val riderGpsActive by viewModel.isRiderGpsActive.collectAsState()
+    var showConfirmationCard by remember { mutableStateOf(true) }
+
+    // Brand color palette matching visual design specifications
+    val primaryOrange = Color(0xFFFF6D00)
+    val lightBorderColor = Color(0xFFE8DED5)
+    val premiumCreamBg = Color(0xFFFCF9F8)
+    val darkTextColor = Color(0xFF111111)
+    val mutedTextColor = Color(0xFF6B5F5A)
+    val secondaryPanelBg = Color(0xFFFFF4EC)
+    val successGreen = Color(0xFF2E7D32)
 
     // Request permissions launcher for GPS location tracking
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -76,7 +83,7 @@ fun TrackingScreen(
         }
     }
 
-    // Automatically request Notification permission on startup with a brief delay to prevent lifecycle/focus race conditions
+    // Automatically request Notification permission on startup with a brief delay
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             try {
@@ -91,16 +98,15 @@ fun TrackingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(premiumCreamBg)
     ) {
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Elegant, Clean Top Header Bar consistent with the warm design
+            // Header Section
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
                     .statusBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
@@ -108,12 +114,13 @@ fun TrackingScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Circular close/back button
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(42.dp)
+                            .shadow(elevation = 1.dp, shape = CircleShape)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.background)
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), CircleShape)
+                            .background(Color.White)
                             .clickable { onNavigateHome() }
                             .testTag("back_button_tracking"),
                         contentAlignment = Alignment.Center
@@ -121,34 +128,40 @@ fun TrackingScreen(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Cerrar",
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = darkTextColor,
                             modifier = Modifier.size(20.dp)
                         )
                     }
+
                     Spacer(modifier = Modifier.width(16.dp))
+
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Rastreo de Pedido",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = darkTextColor,
+                            letterSpacing = (-0.5).sp
                         )
                         Text(
                             text = order?.orderId ?: "Buscando...",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.secondary,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 14.sp,
+                            color = primaryOrange,
+                            fontWeight = FontWeight.Black
                         )
                     }
 
-                    // Action to advance state manually (Acelerar simulación debug button styled clean)
-                    Button(
-                        onClick = { viewModel.forceStateAdvance() },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary.copy(alpha = 0.1f)),
-                        shape = CircleShape,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    // "Acelerar" badge button (Debug simulation trigger)
+                    Box(
                         modifier = Modifier
-                            .testTag("force_advance_button")
+                            .shadow(elevation = 1.dp, shape = CircleShape)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFF0E6))
+                            .border(1.dp, Color(0xFFFFCCAA), CircleShape)
+                            .clickable { viewModel.forceStateAdvance() }
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                            .testTag("force_advance_button"),
+                        contentAlignment = Alignment.Center
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -157,14 +170,14 @@ fun TrackingScreen(
                             Icon(
                                 imageVector = Icons.Default.FlashOn,
                                 contentDescription = "sim",
-                                tint = MaterialTheme.colorScheme.secondary,
-                                modifier = Modifier.size(14.dp)
+                                tint = Color(0xFFFF5200),
+                                modifier = Modifier.size(13.dp)
                             )
                             Text(
                                 text = "Acelerar ⚡",
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.secondary,
-                                fontWeight = FontWeight.Bold
+                                fontSize = 11.sp,
+                                color = Color(0xFFFF5200),
+                                fontWeight = FontWeight.Black
                             )
                         }
                     }
@@ -174,23 +187,87 @@ fun TrackingScreen(
             if (order == null) {
                 val activeOrderId by viewModel.activeOrderId.collectAsState()
                 if (activeOrderId == null) {
+                    // Empty state centered view when no order exists
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .padding(16.dp),
+                            .padding(24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        EmptyStateContent(
-                            title = "No hay pedido en camino",
-                            subtitle = "Cuando confirmes un pedido, podrás rastrear aquí el avance del repartidor.",
-                            buttonText = "Ir al menú",
-                            icon = Icons.Default.LocalShipping,
-                            onButtonClick = onNavigateHome,
-                            testTag = "empty_tracking_state"
-                        )
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
+                                .border(1.dp, lightBorderColor, RoundedCornerShape(24.dp))
+                                .testTag("empty_tracking_state"),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(24.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFFFF4EC)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocalShipping,
+                                        contentDescription = null,
+                                        tint = primaryOrange,
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(20.dp))
+
+                                Text(
+                                    text = "No hay pedido en camino",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = darkTextColor,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                Text(
+                                    text = "Cuando confirmes un pedido, podrás rastrear aquí el avance del repartidor.",
+                                    fontSize = 13.sp,
+                                    color = mutedTextColor,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 18.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(24.dp))
+
+                                Button(
+                                    onClick = onNavigateHome,
+                                    colors = ButtonDefaults.buttonColors(containerColor = primaryOrange),
+                                    shape = CircleShape,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(50.dp)
+                                        .testTag("empty_back_to_menu"),
+                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "Volver a la Tienda 🏠",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
                     }
                 } else {
+                    // Loading State
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -198,9 +275,9 @@ fun TrackingScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                            CircularProgressIndicator(color = primaryOrange)
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(text = "Cargando ticket de orden...", color = TextMuted, fontSize = 13.sp)
+                            Text(text = "Cargando ticket de orden...", color = mutedTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -212,138 +289,280 @@ fun TrackingScreen(
                         .weight(1f)
                         .fillMaxWidth()
                         .testTag("tracking_scroll_panel"),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 120.dp),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    if (showConfirmationCard && ord.status == "RECIBIDO") {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .shadow(elevation = 2.dp, shape = RoundedCornerShape(24.dp))
+                                    .border(1.dp, Color(0xFFFFD1B3), RoundedCornerShape(24.dp)),
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9F5)),
+                                shape = RoundedCornerShape(24.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(20.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(64.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFFEAD9)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = "Check",
+                                            tint = primaryOrange,
+                                            modifier = Modifier.size(36.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "¡Pedido recibido!",
+                                        fontSize = 22.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = darkTextColor
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = "Tu orden ya está en cocina. Puedes rastrear el avance o enviar el ticket por WhatsApp.",
+                                        fontSize = 14.sp,
+                                        color = mutedTextColor,
+                                        textAlign = TextAlign.Center,
+                                        lineHeight = 20.sp
+                                    )
+                                    Spacer(modifier = Modifier.height(20.dp))
+                                    
+                                    Button(
+                                        onClick = { showConfirmationCard = false },
+                                        colors = ButtonDefaults.buttonColors(containerColor = primaryOrange),
+                                        shape = CircleShape,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(50.dp),
+                                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "Ver rastreo",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                    
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    
+                                    OutlinedButton(
+                                        onClick = { sendWhatsAppOrderText(context, ord) },
+                                        shape = CircleShape,
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF2E7D32)),
+                                        border = BorderStroke(1.5.dp, Color(0xFF2E7D32)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(50.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Share,
+                                                contentDescription = "Compartir",
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "Enviar por WhatsApp",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 15.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
 
-                    // 1. CHOSEN MAP CANVAS tracking
+                    // 1. MAP CANVAS CARD
                     item {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
                                 text = "MAPA EN TRÁNSITO",
                                 fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(bottom = 8.dp)
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.3.sp,
+                                color = Color(0xFFC94D00),
+                                modifier = Modifier.padding(bottom = 8.dp, start = 4.dp)
                             )
 
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .shadow(elevation = 2.dp, shape = RoundedCornerShape(24.dp))
-                                    .border(
-                                        1.dp,
-                                        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                                        RoundedCornerShape(24.dp)
-                                    ),
+                                    .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
+                                    .border(1.dp, lightBorderColor, RoundedCornerShape(24.dp)),
                                 shape = RoundedCornerShape(24.dp),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                                colors = CardDefaults.cardColors(containerColor = Color.White)
                             ) {
-                                CourierMapCanvas(
-                                    courierLat = ord.currentCourierLat,
-                                    courierLng = ord.currentCourierLng,
-                                    destLat = ord.destinationLat,
-                                    destLng = ord.destinationLng,
-                                    municipality = ord.municipality,
-                                    status = ord.status,
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(260.dp)
+                                        .height(280.dp)
                                         .clip(RoundedCornerShape(24.dp))
-                                        .testTag("map_canvas")
-                                )
+                                ) {
+                                    CourierMapCanvas(
+                                        courierLat = ord.currentCourierLat,
+                                        courierLng = ord.currentCourierLng,
+                                        destLat = ord.destinationLat,
+                                        destLng = ord.destinationLng,
+                                        municipality = ord.municipality,
+                                        status = ord.status,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .testTag("map_canvas")
+                                    )
+
+                                    // Status info label overlaid on the map (top-left)
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopStart)
+                                            .padding(14.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFEDE7F6))
+                                            .border(1.dp, Color(0xFFD1C4E9), CircleShape)
+                                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(16.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFF512DA8)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "i",
+                                                    color = Color.White,
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Black
+                                                )
+                                            }
+                                            Text(
+                                                text = when (ord.status) {
+                                                    "RECIBIDO" -> "Localizando repartidor..."
+                                                    "PREPARANDO" -> "Preparando en Kis & Kei..."
+                                                    "LISTO" -> "Esperando recolección..."
+                                                    "EN_CAMINO" -> "Repartidor en camino..."
+                                                    "ENTREGADO" -> "Pedido entregado con éxito"
+                                                    else -> "Localizando repartidor..."
+                                                },
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF512DA8)
+                                            )
+                                        }
+                                    }
+
+                                    // Compass centring action button bottom-right visual overlay
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(14.dp)
+                                            .size(42.dp)
+                                            .shadow(elevation = 2.dp, shape = CircleShape)
+                                            .clip(CircleShape)
+                                            .background(Color.White)
+                                            .border(1.dp, Color(0xFFFFD1B3), CircleShape)
+                                            .clickable {
+                                                Toast.makeText(context, "Centrando mapa...", Toast.LENGTH_SHORT).show()
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.NearMe,
+                                            contentDescription = "Centrar",
+                                            tint = primaryOrange,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // 1.5 MÓDULO DE REPARTIDOR: GPS EN VIVO
+                    // LIVE GPS SIMULATOR CONTROLS
                     if (ord.deliveryMethod == "ENVIO" && ord.status != "ENTREGADO") {
                         item {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
-                                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
+                                    .border(1.dp, Color(0xFFFFEAE0), RoundedCornerShape(20.dp))
                                     .testTag("rider_gps_control_card"),
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                                shape = RoundedCornerShape(24.dp)
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDFB)),
+                                shape = RoundedCornerShape(20.dp)
                             ) {
-                                Column(modifier = Modifier.padding(20.dp)) {
+                                Column(modifier = Modifier.padding(16.dp)) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clip(CircleShape)
-                                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.MyLocation,
-                                                contentDescription = "GPS",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
+                                        Icon(
+                                            imageVector = Icons.Default.MyLocation,
+                                            contentDescription = "GPS",
+                                            tint = primaryOrange,
+                                            modifier = Modifier.size(16.dp)
+                                        )
                                         Text(
                                             text = "Modo Repartidor (GPS en Vivo) 🛵",
-                                            fontSize = 15.sp,
+                                            fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = darkTextColor
                                         )
                                     }
-                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
-                                        text = "Usa tu ubicación actual como la del chofer en reparto. Al mover la ubicación (o usar los controles del simulador Android), el mapa reflejará tus coordenadas en vivo.",
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        lineHeight = 16.sp
+                                        text = "Usa tu ubicación actual como la del chofer en reparto. Al mover la ubicación, el mapa reflejará tus coordenadas en vivo.",
+                                        fontSize = 11.sp,
+                                        color = mutedTextColor,
+                                        lineHeight = 15.sp
                                     )
-                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Spacer(modifier = Modifier.height(12.dp))
 
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color(0xFFFFF4EC), RoundedCornerShape(12.dp))
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                                         ) {
-                                            if (riderGpsActive) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(8.dp)
-                                                        .clip(CircleShape)
-                                                        .background(FreshGreen)
-                                                )
-                                                Text(
-                                                    text = "Transmitiendo GPS...",
-                                                    fontSize = 12.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = FreshGreen
-                                                )
-                                            } else {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .size(8.dp)
-                                                        .clip(CircleShape)
-                                                        .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
-                                                )
-                                                Text(
-                                                    text = "Transmisión inactiva",
-                                                    fontSize = 12.sp,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            }
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .clip(CircleShape)
+                                                    .background(if (riderGpsActive) successGreen else mutedTextColor.copy(alpha = 0.5f))
+                                            )
+                                            Text(
+                                                text = if (riderGpsActive) "Transmitiendo GPS..." else "Transmisión inactiva",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = if (riderGpsActive) successGreen else mutedTextColor
+                                            )
                                         }
 
-                                        Switch(
-                                            checked = riderGpsActive,
-                                            onCheckedChange = { checked ->
+                                        WithRiderGpsSwitch(
+                                            riderGpsActive = riderGpsActive,
+                                            onToggle = { checked ->
                                                 if (checked) {
                                                     locationPermissionLauncher.launch(
                                                         arrayOf(
@@ -356,7 +575,9 @@ fun TrackingScreen(
                                                     Toast.makeText(context, "Transmisión GPS desactivada", Toast.LENGTH_SHORT).show()
                                                 }
                                             },
-                                            modifier = Modifier.testTag("rider_gps_switch")
+                                            primaryOrange = primaryOrange,
+                                            lightBorderColor = lightBorderColor,
+                                            mutedTextColor = mutedTextColor
                                         )
                                     }
                                 }
@@ -364,97 +585,240 @@ fun TrackingScreen(
                         }
                     }
 
-                    // 2. LIVE PROGRESS CARD (Stages of preparation)
+                    // 2. TIMELINE PROGRESS CARD
                     item {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .shadow(elevation = 2.dp, shape = RoundedCornerShape(28.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(28.dp)),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(28.dp)
+                                .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
+                                .border(1.dp, lightBorderColor, RoundedCornerShape(24.dp)),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(24.dp)
                         ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
+                            Column(modifier = Modifier.padding(18.dp)) {
                                 Text(
                                     text = "Progreso del Pedido",
-                                    fontSize = 16.sp,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = darkTextColor
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                val dynamicMessage = when (ord.status) {
+                                    "RECIBIDO" -> "Tu pedido ya entró a cocina."
+                                    "PREPARANDO" -> "Estamos cocinando tu antojo."
+                                    "LISTO" -> "Tu pedido está listo para salir."
+                                    "EN_CAMINO" -> "El repartidor va hacia ti."
+                                    "ENTREGADO" -> "Pedido entregado con éxito."
+                                    else -> "Procesando tu pedido..."
+                                }
+                                Text(
+                                    text = dynamicMessage,
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = primaryOrange
                                 )
-                                Spacer(modifier = Modifier.height(18.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
 
-                                // Stages representation
-                                OrderProgressStateRow(
+                                // Dynamic Timeline
+                                OrderProgressStateRowTimeline(
                                     activeStatus = ord.status,
-                                    method = ord.deliveryMethod
+                                    method = ord.deliveryMethod,
+                                    primaryOrange = primaryOrange,
+                                    darkTextColor = darkTextColor,
+                                    mutedTextColor = mutedTextColor
                                 )
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                HorizontalDivider(
+                                    color = Color(0xFFF2ECE7),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(vertical = 12.dp)
+                                )
+
+                                // ETA / Courier Summary Row
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(Color(0xFFFFF9F5))
+                                        .border(1.dp, Color(0xFFFFE0CC), RoundedCornerShape(16.dp))
+                                        .padding(14.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Left: Tiempo estimado
+                                        Row(
+                                            modifier = Modifier.weight(1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFFFEAD9)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Schedule,
+                                                    contentDescription = "ETA",
+                                                    tint = primaryOrange,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Tiempo estimado",
+                                                    fontSize = 11.sp,
+                                                    color = mutedTextColor,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                Text(
+                                                    text = "${ord.estimatedTimeMinutes} min",
+                                                    fontSize = 15.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = darkTextColor
+                                                )
+                                            }
+                                        }
+
+                                        Box(
+                                            modifier = Modifier
+                                                .height(40.dp)
+                                                .width(1.dp)
+                                                .background(Color(0xFFFFD5BD))
+                                        )
+
+                                        Spacer(modifier = Modifier.width(10.dp))
+
+                                        // Right: Repartidor asignado
+                                        Row(
+                                            modifier = Modifier.weight(1.1f),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(40.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFFFEAD9)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Person,
+                                                    contentDescription = "Repartidor",
+                                                    tint = primaryOrange,
+                                                    modifier = Modifier.size(22.dp)
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Column {
+                                                Text(
+                                                    text = "Repartidor asignado",
+                                                    fontSize = 11.sp,
+                                                    color = mutedTextColor,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                                Text(
+                                                    text = when (ord.status) {
+                                                        "ENTREGADO" -> "Entregado por Ulices"
+                                                        "EN_CAMINO" -> "Ulices en camino"
+                                                        "LISTO" -> "Ulices listo para salir"
+                                                        else -> "Ulices asignado"
+                                                    },
+                                                    fontSize = 13.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = darkTextColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
 
-                    // 3. WHATSAPP CONFIRMATION CTA - Styled in gorgeous warm green theme
+                    // 3. WHATSAPP COORDINATION CARD
                     item {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF5E9)),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
                                 .border(1.dp, Color(0xFFC8E6C9), RoundedCornerShape(24.dp)),
                             shape = RoundedCornerShape(24.dp)
                         ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
+                            Column(modifier = Modifier.padding(18.dp)) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Chat,
-                                        contentDescription = "whatsapp",
-                                        tint = Color(0xFF2E7D32)
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(40.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFF2E7D32).copy(alpha = 0.12f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        // Standard Chat bubble or phone vector representer
+                                        Icon(
+                                            imageVector = Icons.Default.Forum,
+                                            contentDescription = "WhatsApp Coordinación",
+                                            tint = Color(0xFF1B5E20),
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
                                     Text(
                                         text = "Coordinación por WhatsApp",
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Black,
                                         color = Color(0xFF1B5E20)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(8.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
                                 Text(
                                     text = "¡Manda el pedido directamente al WhatsApp del negocio de mi amigo! Así tendrá tu orden y podrá enviarte los detalles de cobro o confirmar tu entrega.",
                                     fontSize = 12.sp,
-                                    color = Color(0xFF33691E),
-                                    lineHeight = 16.sp
+                                    color = Color(0xFF2E7D32),
+                                    lineHeight = 17.sp
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
+                                
+                                // Enviar Ticket por WhatsApp button matching specifications
                                 Button(
-                                    onClick = {
-                                        sendWhatsAppOrderText(context, ord)
-                                    },
+                                    onClick = { sendWhatsAppOrderText(context, ord) },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                                     shape = CircleShape,
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(50.dp)
-                                        .testTag("whatsapp_message_button")
+                                        .height(52.dp)
+                                        .testTag("whatsapp_message_button"),
+                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center,
-                                        modifier = Modifier.fillMaxWidth()
+                                        horizontalArrangement = Arrangement.Center
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Share,
-                                            contentDescription = "share",
+                                            contentDescription = "Compartir",
                                             tint = Color.White,
-                                            modifier = Modifier.size(18.dp)
+                                            modifier = Modifier.size(16.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "Enviar Ticket por WhatsApp 💬",
-                                            fontSize = 13.sp,
+                                            text = "Enviar Ticket por WhatsApp",
+                                            fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = Color.White
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Icon(
+                                            imageVector = Icons.Default.Forum,
+                                            contentDescription = "Chat Bubble Symbol",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
                                         )
                                     }
                                 }
@@ -462,105 +826,190 @@ fun TrackingScreen(
                         }
                     }
 
-                    // 4. DETAILED ADDRESS / INFO
+                    // 4. DELIVERY DETAILS / PAYMENT CARD (Datos de Entrega / Pago)
                     item {
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .shadow(elevation = 1.dp, shape = RoundedCornerShape(26.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f), RoundedCornerShape(26.dp)),
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                            shape = RoundedCornerShape(26.dp)
+                                .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
+                                .border(1.dp, lightBorderColor, RoundedCornerShape(24.dp)),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(24.dp)
                         ) {
-                            Column(modifier = Modifier.padding(20.dp)) {
-                                Text(
-                                    text = "Datos de Entrega / Pago",
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Divider(
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                            Column(modifier = Modifier.padding(18.dp)) {
+                                // Title Row
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(Color(0xFFFFF4EC)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Assignment,
+                                            contentDescription = "Datos de Entrega",
+                                            tint = primaryOrange,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Datos de Entrega / Pago",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Black,
+                                        color = darkTextColor
+                                    )
+                                }
+
+                                HorizontalDivider(
+                                    color = Color(0xFFF2ECE7),
+                                    thickness = 1.dp,
                                     modifier = Modifier.padding(vertical = 12.dp)
                                 )
 
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                                    Icon(imageVector = Icons.Default.Person, contentDescription = "C", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(text = "Cliente: ${ord.customerName}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
+                                // Row 1: Cliente: Name
+                                InfoItemRow(
+                                    icon = Icons.Default.Person,
+                                    label = "Cliente",
+                                    value = ord.customerName,
+                                    primaryOrange = primaryOrange,
+                                    darkTextColor = darkTextColor
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Row 2: Teléfono: Phone
+                                InfoItemRow(
+                                    icon = Icons.Default.Phone,
+                                    label = "Teléfono",
+                                    value = ord.phone,
+                                    primaryOrange = primaryOrange,
+                                    darkTextColor = darkTextColor
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Row 3: Dirección: Address
+                                InfoItemRow(
+                                    icon = Icons.Default.LocationOn,
+                                    label = "Dirección",
+                                    value = "${ord.address} (${if (ord.deliveryMethod == "RECOGER") "Pasar a recoger en Jaral del Progreso" else ord.municipality.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }})",
+                                    primaryOrange = primaryOrange,
+                                    darkTextColor = darkTextColor
+                                )
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Row 4: Método de Pago
+                                InfoItemRow(
+                                    icon = Icons.Default.CreditCard,
+                                    label = "Método de Pago",
+                                    value = if (ord.paymentMethod == "EFECTIVO") "Pago contra entrega (Efectivo)" else "Transferencia Bancaria",
+                                    primaryOrange = primaryOrange,
+                                    darkTextColor = darkTextColor
+                                )
+
+                                Spacer(modifier = Modifier.height(14.dp))
+
+                                // Cash pay/exchange details if Cash Payment Method
+                                if (ord.paymentMethod == "EFECTIVO") {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(Color(0xFFFFF1F0))
+                                            .border(1.dp, Color(0xFFFFD1D1), RoundedCornerShape(12.dp))
+                                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Payments,
+                                                contentDescription = "Pago efectivo",
+                                                tint = Color(0xFFD32F2F),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Text(
+                                                text = if (ord.cashPayWith > 0.0) {
+                                                    "Paga con: $${ord.cashPayWith.toInt()} MXN (Llevar cambio)"
+                                                } else {
+                                                    "Paga con cantidad exacta"
+                                                },
+                                                fontSize = 13.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFD32F2F)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(14.dp))
                                 }
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                                    Icon(imageVector = Icons.Default.Phone, contentDescription = "P", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(text = "Teléfono: ${ord.phone}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface)
-                                }
-                                Row(verticalAlignment = Alignment.Top, modifier = Modifier.padding(vertical = 4.dp)) {
-                                    Icon(imageVector = Icons.Default.Home, contentDescription = "D", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp).padding(top = 2.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                HorizontalDivider(
+                                    color = Color(0xFFF2ECE7),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(vertical = 12.dp)
+                                )
+
+                                // Row: Alimentos Ordenados title
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(28.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFFF4EC)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Restaurant,
+                                            contentDescription = "Alimentos Ordenados",
+                                            tint = primaryOrange,
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
                                     Text(
-                                        text = "Dirección: ${ord.address} (${if (ord.deliveryMethod == "RECOGER") "Pasar a recoger en Jaral del Progreso" else ord.municipality.replace("_", " ")})",
+                                        text = "Alimentos Ordenados:",
                                         fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        lineHeight = 16.sp
-                                    )
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                                    Icon(imageVector = Icons.Default.CreditCard, contentDescription = "Pa", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "Método de Pago: ${if (ord.paymentMethod == "EFECTIVO") "Pago contra entrega (Efectivo)" else "Transferencia Bancaria"}",
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                        fontWeight = FontWeight.Bold,
+                                        color = primaryOrange
                                     )
                                 }
 
-                                if (ord.paymentMethod == "EFECTIVO") {
-                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-                                        Icon(imageVector = Icons.Default.Payments, contentDescription = "Ch", tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = if (ord.cashPayWith > 0.0) {
-                                                "Paga con: $${ord.cashPayWith.toInt()} MXN (Llevar cambio)"
-                                            } else {
-                                                "Paga con cantidad exacta"
-                                            },
-                                            fontSize = 13.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.secondary
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                // Parse foods and render mini cards
+                                val parts = ord.itemsJson.split("; ").filter { it.isNotBlank() }
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    parts.forEach { part ->
+                                        ProductItemRowBubble(
+                                            itemText = part,
+                                            primaryOrange = primaryOrange
                                         )
                                     }
                                 }
-
-                                Divider(
-                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                                    modifier = Modifier.padding(vertical = 12.dp)
-                                )
-
-                                Text(
-                                    text = "Alimentos Ordenados:",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = ord.itemsJson,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    lineHeight = 18.sp,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(MaterialTheme.colorScheme.background, RoundedCornerShape(12.dp))
-                                        .padding(12.dp)
-                                )
                             }
                         }
+                    }
+
+                    // Scrolling bottom margin
+                    item {
+                        Spacer(modifier = Modifier.height(10.dp))
                     }
                 }
             }
         }
 
-        // Return Home sticky bottom button styled as modern Pill
+        // Return Home modern sticky bottom button styled as beautiful orange Pill-shaped card
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -570,149 +1019,360 @@ fun TrackingScreen(
         ) {
             Button(
                 onClick = onNavigateHome,
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                colors = ButtonDefaults.buttonColors(containerColor = primaryOrange),
                 shape = CircleShape,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp)
                     .testTag("back_to_menu_sticky"),
-                elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp)
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Home,
+                        contentDescription = "Home",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Volver a la Tienda",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+// Beautiful helper row for Delivery particulars
+@Composable
+fun InfoItemRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    value: String,
+    primaryOrange: Color,
+    darkTextColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(Color(0xFFFFF4EC)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = primaryOrange,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Volver a la Tienda 🏠",
-                    color = Color.White,
+                    text = "$label: ",
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    color = darkTextColor
+                )
+                Text(
+                    text = value,
+                    fontSize = 13.sp,
+                    color = darkTextColor,
+                    lineHeight = 16.sp
                 )
             }
         }
     }
 }
 
+// Beautiful horizontal food cards per ordered item, loaded dynamically with a quality placeholder Unsplash wings photo
 @Composable
-fun OrderProgressStateRow(
-    activeStatus: String,
-    method: String
+fun ProductItemRowBubble(
+    itemText: String,
+    primaryOrange: Color
 ) {
-    val statuses = listOf("RECIBIDO", "PREPARANDO", "LISTO", "EN_CAMINO", "ENTREGADO")
-    val displayNames = listOf("Recibido", "En Plancha", "Listo", "En Camino", "Entregado")
-    val icons = listOf(Icons.Default.Receipt, Icons.Default.DinnerDining, Icons.Default.Fastfood, Icons.Default.DeliveryDining, Icons.Default.CheckCircle)
+    // Unsplash BBQ chicken wings image URL
+    val alitasUrl = "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&q=80&w=200"
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xFFFFF9F6))
+            .border(1.dp, Color(0xFFF2E6DD), RoundedCornerShape(20.dp))
+            .padding(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(54.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFEAD9))
+                    .border(1.dp, Color(0xFFFFD1B3), CircleShape)
+            ) {
+                AsyncImage(
+                    model = alitasUrl,
+                    contentDescription = "Comida",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+
+            Text(
+                text = itemText,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF111111),
+                lineHeight = 16.sp,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+fun WithRiderGpsSwitch(
+    riderGpsActive: Boolean,
+    onToggle: (Boolean) -> Unit,
+    primaryOrange: Color,
+    lightBorderColor: Color,
+    mutedTextColor: Color
+) {
+    Switch(
+        checked = riderGpsActive,
+        onCheckedChange = onToggle,
+        colors = SwitchDefaults.colors(
+            checkedThumbColor = Color.White,
+            checkedTrackColor = primaryOrange,
+            uncheckedThumbColor = mutedTextColor,
+            uncheckedTrackColor = lightBorderColor
+        ),
+        modifier = Modifier.testTag("rider_gps_switch")
+    )
+}
+
+@Composable
+fun OrderProgressStateRowTimeline(
+    activeStatus: String,
+    method: String,
+    primaryOrange: Color,
+    darkTextColor: Color,
+    mutedTextColor: Color
+) {
+    val statuses = if (method == "RECOGER") {
+        listOf("RECIBIDO", "PREPARANDO", "LISTO", "ENTREGADO")
+    } else {
+        listOf("RECIBIDO", "PREPARANDO", "LISTO", "EN_CAMINO", "ENTREGADO")
+    }
+
+    val displayNames = if (method == "RECOGER") {
+        listOf("Pedido recibido", "En preparación", "Listo para recoger", "Entregado")
+    } else {
+        listOf("Pedido recibido", "En preparación", "Listo para salir", "En camino", "Entregado")
+    }
+
+    val icons = if (method == "RECOGER") {
+        listOf(Icons.Default.Receipt, Icons.Default.DinnerDining, Icons.Default.Fastfood, Icons.Default.CheckCircle)
+    } else {
+        listOf(Icons.Default.Receipt, Icons.Default.DinnerDining, Icons.Default.Fastfood, Icons.Default.DeliveryDining, Icons.Default.CheckCircle)
+    }
+
+    val subtitles = if (method == "RECOGER") {
+        listOf(
+            "Ya tenemos tu orden. En unos momentos comenzamos a prepararla.",
+            "Estamos preparando tu pedido con todo el sabor.",
+            "Tu pedido está listo y esperando en el mostrador.",
+            "Disfruta tu pedido. ¡Gracias por elegir Alitas Kis y Kei!"
+        )
+    } else {
+        listOf(
+            "Ya tenemos tu orden. En unos momentos comenzamos a prepararla.",
+            "Estamos preparando tu pedido con todo el sabor.",
+            "Tu pedido está listo y esperando al repartidor.",
+            "Tus alitas ya van rumbo a tu ubicación calientitas 🔥",
+            "Disfruta tu pedido. ¡Gracias por elegir Alitas Kis y Kei!"
+        )
+    }
 
     val activeIdx = statuses.indexOf(activeStatus).coerceAtLeast(0)
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier = Modifier.fillMaxWidth()
     ) {
         for (i in statuses.indices) {
-            // If Recoger is chosen, we omit EN_CAMINO stage logic
-            if (method == "RECOGER" && statuses[i] == "EN_CAMINO") continue
+            val isPassed = i < activeIdx || (activeStatus == "ENTREGADO" && statuses[i] == "ENTREGADO")
+            val isCurrent = i == activeIdx && activeStatus != "ENTREGADO"
+            val isNotLast = i < statuses.size - 1
 
-            val isPassed = i <= activeIdx
-            val isCurrent = i == activeIdx
-
-            val label = if (method == "RECOGER" && statuses[i] == "LISTO") "Listo para Recoger" else displayNames[i]
-
-            val accentColor = when {
-                isCurrent -> if (activeStatus == "ENTREGADO") FreshGreen else MaterialTheme.colorScheme.secondary
-                isPassed -> MaterialTheme.colorScheme.primary
-                else -> MaterialTheme.colorScheme.background
-            }
-
-            val iconColor = if (isPassed) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            // Solid orange line if the CURRENT step is passed, and the next step is also passed or current
+            val isPassedToNext = i < activeIdx
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .animateContentSize(),
-                verticalAlignment = Alignment.CenterVertically
+                    .height(IntrinsicSize.Min)
             ) {
-                // Circle Node styled clean
+                // Left progress node and vertical timeline line creator
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(26.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(3.dp))
+
+                    // Double circle node or filled check node based on active status
+                    if (isPassed) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(primaryOrange),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = null,
+                                tint = Color.White,
+                                modifier = Modifier.size(12.dp)
+                            )
+                        }
+                    } else if (isCurrent) {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .border(2.dp, primaryOrange, CircleShape)
+                                .background(Color.White),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(primaryOrange)
+                            )
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .border(1.5.dp, Color(0xFFCCCCCC), CircleShape)
+                                .background(Color.White)
+                        )
+                    }
+
+                    if (isNotLast) {
+                        if (isPassedToNext) {
+                            Spacer(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .width(2.5.dp)
+                                    .background(primaryOrange)
+                            )
+                        } else {
+                            // Dotted timeline line
+                            Canvas(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .width(2.5.dp)
+                            ) {
+                                val pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f), 0f)
+                                drawLine(
+                                    color = Color(0xFFD4C8C2),
+                                    start = androidx.compose.ui.geometry.Offset(size.width / 2, 0f),
+                                    end = androidx.compose.ui.geometry.Offset(size.width / 2, size.height),
+                                    pathEffect = pathEffect,
+                                    strokeWidth = 2.5.dp.toPx()
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Left element visual icon representer
                 Box(
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(accentColor)
-                        .border(
-                            1.dp,
-                            if (isPassed) Color.Transparent else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
-                            CircleShape
-                        ),
+                        .background(if (isPassed || isCurrent) Color(0xFFFFF4EC) else Color(0xFFFCF9F8)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icons[i],
-                        contentDescription = label,
-                        tint = iconColor,
-                        modifier = Modifier.size(18.dp)
+                        contentDescription = null,
+                        tint = if (isPassed || isCurrent) primaryOrange else Color(0xFF9E9E9E),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(14.dp))
 
-                // Text Description with Stitch AI styled warm container/chips
-                Column(modifier = Modifier.weight(1f)) {
+                // Heading titles and subtitles text information
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(bottom = 20.dp)
+                ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = label,
-                            fontSize = 14.sp,
+                            text = displayNames[i],
+                            fontSize = 15.sp,
                             fontWeight = if (isCurrent) FontWeight.Black else FontWeight.Bold,
-                            color = if (isPassed) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (isPassed || isCurrent) darkTextColor else Color(0xFF9E9E9E)
                         )
+
                         if (isCurrent) {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(SoftAlertLabelColor(activeStatus))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFFEFE3))
+                                    .padding(horizontal = 8.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = "ACTIVO",
-                                    fontSize = 8.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
+                                    fontSize = 9.sp,
+                                    color = primaryOrange,
+                                    fontWeight = FontWeight.Black
                                 )
                             }
                         }
                     }
 
-                    if (isCurrent) {
-                        Text(
-                            text = when (activeStatus) {
-                                "RECIBIDO" -> "Estamos procesando tu orden de Kis y Kei en el sistema..."
-                                "PREPARANDO" -> "El chef de alitas ya encendió la freidora y está dorando las alitas/papas con salsa BBQ/Búfalo..."
-                                "LISTO" -> {
-                                    if (method == "RECOGER") "¡Listo! Ya puedes venir por él a nuestro mostrador calientito en Jaral del Progreso."
-                                    else "¡Listo! La comida está empacada térmicamente para salir en ruta."
-                                }
-                                "EN_CAMINO" -> "Repartidor de Kis y Kei en ruta activa. Puedes monitorear su GPS en vivo desde el mapa arriba."
-                                "ENTREGADO" -> "¡Llegó con éxito! Muchas gracias por comprar con Alitas Kis y Kei. ¡Buen provecho!"
-                                else -> "Cargando etapa..."
-                            },
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            lineHeight = 14.sp,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = subtitles[i],
+                        fontSize = 12.sp,
+                        color = if (isPassed || isCurrent) mutedTextColor else Color(0xFF9E9E9E),
+                        lineHeight = 16.sp
+                    )
                 }
             }
         }
-    }
-}
-
-fun SoftAlertLabelColor(status: String): Color {
-    return when (status) {
-        "RECIBIDO" -> Color(0xFF9E9A85) // soft earthy sage tint for Received status
-        "PREPARANDO" -> WarningOrange  // Warm Orange
-        "LISTO" -> FreshGreen          // Fresh Green
-        "EN_CAMINO" -> HoneyGold       // Soft Red accent
-        "ENTREGADO" -> FreshGreen
-        else -> Color.Gray
     }
 }
 

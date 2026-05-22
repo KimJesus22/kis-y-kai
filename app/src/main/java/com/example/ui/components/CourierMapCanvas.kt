@@ -91,9 +91,11 @@ fun CourierMapCanvas(
             val maxLng = -100.9300
 
             fun mapToScreen(lat: Double, lng: Double): Offset {
-                // If coordinates are clearly omitted, default, or zero, fallback to store coordinates of Jaral
-                val safeLat = if (lat < 1.0) storeLat else lat
-                val safeLng = if (lng > -10.0) storeLng else lng
+                // If coordinates are NaN, clearly omitted, default, or zero, fallback to store coordinates of Jaral
+                val isLatInvalid = lat.isNaN() || lat.isInfinite() || lat < 1.0
+                val isLngInvalid = lng.isNaN() || lng.isInfinite() || lng > -10.0
+                val safeLat = if (isLatInvalid) storeLat else lat
+                val safeLng = if (isLngInvalid) storeLng else lng
 
                 // Constraint clamping to prevent wild native Skia path/dash allocation crashes at extreme coordinates
                 val clampedLat = safeLat.coerceIn(minLat, maxLat)
@@ -103,7 +105,12 @@ fun CourierMapCanvas(
                 val y = height - ((clampedLat - minLat) / (maxLat - minLat) * height).toFloat()
                 // Longitude: minLng maps to 0 (left), maxLng maps to width (right)
                 val x = ((clampedLng - minLng) / (maxLng - minLng) * width).toFloat()
-                return Offset(x, y)
+
+                // Final safety check to avoid returning NaN/Infinite offsets
+                val safeX = if (x.isNaN() || x.isInfinite()) 0f else x
+                val safeY = if (y.isNaN() || y.isInfinite()) 0f else y
+
+                return Offset(safeX, safeY)
             }
 
             val pStore = mapToScreen(storeLat, storeLng)
