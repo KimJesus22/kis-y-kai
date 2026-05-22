@@ -1,0 +1,6 @@
+{
+  "name": "Alitas Kis y Kei",
+  "description": "Aplicación de entrega de comida para Alitas Kis y Kei. Entregas en Valle de Santiago, Cortazar y Jaral del Progreso con rastreo de repartidor en tiempo real, cálculo de distancias y tiempo estimado.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

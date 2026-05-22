@@ -1,0 +1,102 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 1. Basket shadow -->
+    <path
+        android:fillColor="#33000000"
+        android:pathData="M24,78h60c5,0 8,3 8,5s-3,5 -8,5H24c-5,0 -8,-3 -8,-5S19,78 24,78z" />
+
+    <!-- 2. Paper wrapper sheets sticking out -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M26,69 L18,52 L34,58 L40,42 L52,58 L62,45 L70,58 L88,52 L80,69 Z" />
+
+    <!-- 3. Crispy French Fries -->
+    <!-- Fry 1 (Vertical) -->
+    <path
+        android:fillColor="#FFEB3B"
+        android:pathData="M39,32 h6 v30 h-6 z" />
+    <!-- Fry 2 (Vertical taller) -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M46,26 h6 v35 h-6 z" />
+    <!-- Fry 3 (Vertical) -->
+    <path
+        android:fillColor="#FFEB3B"
+        android:pathData="M53,28 h6 v32 h-6 z" />
+    <!-- Fry 4 (Vertical shorter) -->
+    <path
+        android:fillColor="#FFC107"
+        android:pathData="M33,38 h6 v24 h-6 z" />
+    <!-- Fry 5 (Slanted Left) -->
+    <path
+        android:fillColor="#FFEB3B"
+        android:pathData="M34,31 L39,34 L29,56 L24,53 Z" />
+    <!-- Fry 6 (Slanted Right) -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M49,29 L54,32 L44,58 L39,55 Z" />
+
+    <!-- 4. Buffalo Chicken Wings -->
+    <!-- Main Wing Background Shading -->
+    <path
+        android:fillColor="#D84315"
+        android:pathData="M52,65 C48,58 52,46 62,40 C72,34 82,44 80,56 C78,64 68,74 58,74 C54,74 53,70 52,65 Z" />
+    <!-- Main Wing Crispy Orange layer -->
+    <path
+        android:fillColor="#F4511E"
+        android:pathData="M52,65 C49,60 52,49 61,43 C70,37 79,45 78,55 C76,62 67,71 58,71 C55,71 54,68 52,65 Z" />
+    <!-- Main Wing Glaze Highlights -->
+    <path
+        android:fillColor="#FFAB91"
+        android:pathData="M61,45 c0,-2 3,-3 5,-1 c1,2 0,4 -2,3 C62,48 61,47 61,45 Z" />
+
+    <!-- Second Smaller Wing -->
+    <path
+        android:fillColor="#E64A19"
+        android:pathData="M44,70 C41,64 45,56 52,52 C59,48 66,54 64,62 C62,67 55,73 48,73 C45,73 45,72 44,70 Z" />
+    <path
+        android:fillColor="#FFAB91"
+        android:pathData="M49,56 c0,-1 2,-2 3,-1 c1,1 0,3 -2,2 Z" />
+
+    <!-- 5. Black Wire Basket Outer Border -->
+    <path
+        android:fillColor="#212121"
+        android:pathData="M26,69h56c3,0 4,2 4,4 C86,79 80,85 74,85 H34 C28,85 22,79 22,73 C22,71 23,69 26,69 Z" />
+    <!-- Basket rim highlight -->
+    <path
+        android:fillColor="#424242"
+        android:pathData="M26,69h56v2h-56z" />
+    <!-- Grid slots showing paper -->
+    <path
+        android:fillColor="#111111"
+        android:pathData="M30,73h6v6h-6z M40,73h6v6h-6z M50,73h6v6h-6z M60,73h6v6h-6z M70,73h6v6h-6z" />
+
+    <!-- 6. Creamy Ranch Dressing Dip Cup -->
+    <!-- Ramekin Base -->
+    <path
+        android:fillColor="#BDBDBD"
+        android:pathData="M65,65 L79,65 L77,77 a2,2 0 0,1 -2,2 L67,77 a2,2 0 0,1 -2,-2 Z" />
+    <!-- Rim -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M63,65h18v2h-18z" />
+    <!-- Dressing fill (glossy white) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M65,66 c0,-1.5 14,-1.5 14,0 c0,1.5 -14,1.5 -14,0 z" />
+    <!-- Green Chive Speckles -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M69,65.5 h1.5 v1 h-1.5 z" />
+    <path
+        android:fillColor="#388E3C"
+        android:pathData="M73,66 h1 v1 h-1 z" />
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M71,65 h1 v1 h-1 z" />
+
+</vector>
