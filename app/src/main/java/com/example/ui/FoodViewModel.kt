@@ -719,6 +719,7 @@ class FoodViewModel(
         }
     }
 
+    @android.annotation.SuppressLint("MissingPermission")
     private fun startRiderGpsTracking() {
         val orderId = activeOrderId.value ?: return
         // Cancel standard timeline artificial tracking job since we are manually delivering via real GPS coordinate injection!
