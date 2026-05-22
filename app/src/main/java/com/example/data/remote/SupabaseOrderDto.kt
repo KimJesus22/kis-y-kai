@@ -34,5 +34,13 @@ data class SupabaseOrderDto(
     @Json(name = "destination_lat") val destinationLat: Double,
     @Json(name = "destination_lng") val destinationLng: Double,
     @Json(name = "courier_lat") val courierLat: Double,
-    @Json(name = "courier_lng") val courierLng: Double
+    @Json(name = "courier_lng") val courierLng: Double,
+    @Json(name = "created_at") val createdAt: String? = null
 )
+
+@JsonClass(generateAdapter = true)
+data class SupabaseOrderStatusDto(
+    @Json(name = "local_order_id") val localOrderId: String?,
+    @Json(name = "status") val status: String?
+)
+

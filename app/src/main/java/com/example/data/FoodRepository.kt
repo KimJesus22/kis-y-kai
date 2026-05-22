@@ -5,6 +5,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Dispatchers
 import kotlin.math.*
+import com.example.data.remote.SupabaseMenuDataSource
 
 // ----------------------------------------------------
 // MODELS
@@ -15,7 +16,10 @@ data class Product(
     val name: String,
     val description: String,
     val price: Double,
-    val hasSauces: Boolean = true
+    val hasSauces: Boolean = true,
+    val emoji: String? = null,
+    val available: Boolean = true,
+    val sortOrder: Int = 0
 )
 
 data class CartItem(
@@ -272,6 +276,22 @@ class FoodRepository(
 
     suspend fun updateOrderSyncStatus(orderId: String, isSynced: Boolean) = withContext(Dispatchers.IO) {
         orderDao.updateOrderSyncStatus(orderId, isSynced)
+    }
+
+    suspend fun fetchRemoteProducts(): List<Product> = withContext(Dispatchers.IO) {
+        try {
+            val dataSource = SupabaseMenuDataSource()
+            val result = dataSource.getProducts()
+            if (result.isSuccess) {
+                val remoteList = result.getOrNull()
+                if (remoteList != null && remoteList.isNotEmpty()) {
+                    return@withContext remoteList
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        menuProducts
     }
 }
 

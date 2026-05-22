@@ -1,6 +1,9 @@
 package com.example.ui
 
 import android.content.Context
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -31,12 +34,81 @@ class FoodViewModel(
     private val appContext: Context
 ) : ViewModel() {
 
-    init {
-        syncPendingOrders()
+    var salesStats by mutableStateOf<SupabaseSalesStats?>(null)
+        private set
+    var isLoadingStats by mutableStateOf(false)
+        private set
+    var statsError by mutableStateOf<String?>(null)
+        private set
+
+    fun loadSupabaseStats() {
+        viewModelScope.launch {
+            isLoadingStats = true
+            statsError = null
+            try {
+                val dataSource = SupabaseOrderDataSource()
+                val result = dataSource.getRemoteOrders()
+                result.onSuccess { orders ->
+                    val todayStr = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                    
+                    val todayOrders = orders.filter { order ->
+                        order.createdAt?.startsWith(todayStr) == true
+                    }
+                    
+                    val ordersTodayCount = todayOrders.size
+                    val totalRevenueTodayVal = todayOrders.sumOf { it.total }
+                    val avgTicketTodayVal = if (ordersTodayCount > 0) totalRevenueTodayVal / ordersTodayCount else 0.0
+                    
+                    // Sales count by product
+                    val productCounts = mutableMapOf<String, Int>()
+                    orders.forEach { order ->
+                        order.itemsJson.forEach { item ->
+                            val pName = item.productName.trim()
+                            productCounts[pName] = (productCounts[pName] ?: 0) + item.quantity
+                        }
+                    }
+                    val topProductEntry = productCounts.entries.maxByOrNull { it.value }
+                    val bestSellingName = topProductEntry?.key
+                    val bestSellingCount = topProductEntry?.value ?: 0
+                    
+                    // Orders count by municipality
+                    val munCounts = mutableMapOf<String, Int>()
+                    orders.forEach { order ->
+                        val mun = order.municipality
+                        if (!mun.isNullOrBlank()) {
+                            munCounts[mun.trim()] = (munCounts[mun.trim()] ?: 0) + 1
+                        }
+                    }
+                    val topMunEntry = munCounts.entries.maxByOrNull { it.value }
+                    val topMunName = topMunEntry?.key
+                    val topMunCount = topMunEntry?.value ?: 0
+                    
+                    salesStats = SupabaseSalesStats(
+                        ordersToday = ordersTodayCount,
+                        totalRevenueToday = totalRevenueTodayVal,
+                        averageTicketToday = avgTicketTodayVal,
+                        bestSellingProduct = bestSellingName,
+                        bestSellingProductCount = bestSellingCount,
+                        topMunicipality = topMunName,
+                        topMunicipalityCount = topMunCount,
+                        totalOrdersAllTime = orders.size,
+                        totalRevenueAllTime = orders.sumOf { it.total }
+                    )
+                }.onFailure { error ->
+                    statsError = error.message ?: "Error al conectar con Supabase"
+                }
+            } catch (e: Exception) {
+                statsError = e.message ?: "Ocurrió un error inesperado al procesar estadísticas"
+            } finally {
+                isLoadingStats = false
+            }
+        }
     }
 
+
     // Product list (static catalog)
-    val products = repository.menuProducts
+    var products by mutableStateOf<List<Product>>(repository.menuProducts)
+        private set
 
     // Shopping Cart reactive stream
     val cartItems = repository.cartItems.stateIn(
@@ -122,7 +194,33 @@ class FoodViewModel(
     val selectedItemSauce = MutableStateFlow("BBQ")
     val selectedItemNote = MutableStateFlow("")
 
+    var isSyncingPending = MutableStateFlow(false)
+        private set
+
     private var trackingSimulationJob: Job? = null
+    private var remoteStatusPollJob: Job? = null
+
+    init {
+        syncPendingOrders()
+        loadMenuProducts()
+        // Periodic polling for active tracking order status from Supabase
+        viewModelScope.launch {
+            activeOrderId.collect { id ->
+                if (id != null) {
+                    startRemoteStatusPolling(id)
+                } else {
+                    remoteStatusPollJob?.cancel()
+                }
+            }
+        }
+    }
+
+    private fun loadMenuProducts() {
+        viewModelScope.launch {
+            val remoteMenu = repository.fetchRemoteProducts()
+            products = remoteMenu
+        }
+    }
 
     // ----------------------------------------------------
     // ACTIONS
@@ -201,7 +299,7 @@ class FoodViewModel(
                             val quantityPart = rest.substringAfter("(x", "").substringBefore(")")
                             val quantity = quantityPart.toIntOrNull() ?: 1
                             
-                            val product = repository.menuProducts.find {
+                            val product = products.find {
                                 it.name.trim().equals(productName, ignoreCase = true)
                             }
                             if (product != null) {
@@ -423,9 +521,6 @@ class FoodViewModel(
         )
     }
 
-    var isSyncingPending = MutableStateFlow(false)
-        private set
-
     fun syncPendingOrders() {
         if (isSyncingPending.value) return
         viewModelScope.launch {
@@ -518,6 +613,36 @@ class FoodViewModel(
                     title = "¡Entregado! 🎉",
                     text = "¡Buen provecho! Muchas gracias por comprar en Alitas Kis y Kei. Regresa pronto."
                 )
+            }
+        }
+    }
+
+    private fun startRemoteStatusPolling(orderId: String) {
+        remoteStatusPollJob?.cancel()
+        remoteStatusPollJob = viewModelScope.launch {
+            while (activeOrderId.value == orderId) {
+                try {
+                    val dataSource = SupabaseOrderDataSource()
+                    val result = dataSource.getRemoteOrderStatus(orderId)
+                    result.onSuccess { remoteStatus ->
+                        val localOrder = repository.getOrderById(orderId).first()
+                        if (localOrder != null && localOrder.status != remoteStatus) {
+                            val allowedStatuses = listOf("RECIBIDO", "PREPARANDO", "LISTO", "EN_CAMINO", "ENTREGADO", "CANCELADO")
+                            if (allowedStatuses.contains(remoteStatus)) {
+                                repository.updateOrderStatus(orderId, remoteStatus)
+                                addNotification(
+                                    title = "Pedido Actualizado Remotamente 📝",
+                                    text = "Estado cambiado en la base de datos a: $remoteStatus"
+                                )
+                            }
+                        }
+                    }.onFailure {
+                        // Fail silently or handle connection timeout
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                delay(5000) // Poll every 5 seconds
             }
         }
     }
@@ -715,3 +840,15 @@ class FoodViewModelFactory(private val context: Context) : ViewModelProvider.Fac
         return FoodViewModel(repository, context.applicationContext) as T
     }
 }
+
+data class SupabaseSalesStats(
+    val ordersToday: Int,
+    val totalRevenueToday: Double,
+    val averageTicketToday: Double,
+    val bestSellingProduct: String?,
+    val bestSellingProductCount: Int,
+    val topMunicipality: String?,
+    val topMunicipalityCount: Int,
+    val totalOrdersAllTime: Int,
+    val totalRevenueAllTime: Double
+)

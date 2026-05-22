@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -146,6 +147,7 @@ fun MenuScreen(
     val allOrders by viewModel.allOrders.collectAsState()
 
     var showDetailDialogForProduct by remember { mutableStateOf<Product?>(null) }
+    var showAdminStatsDialog by remember { mutableStateOf(false) }
     var showNotificationSheet by remember { mutableStateOf(false) }
     var showHistoryDialog by remember { mutableStateOf(false) }
     var isFavoriteByCustomer by remember { mutableStateOf(false) }
@@ -156,7 +158,7 @@ fun MenuScreen(
             prefs.getStringSet("favorite_ids", emptySet()) ?: emptySet()
         )
     }
-    val favoritedProducts = remember(favoriteIds) {
+    val favoritedProducts = remember(favoriteIds, viewModel.products) {
         viewModel.products.filter { it.id in favoriteIds }
     }
 
@@ -193,7 +195,12 @@ fun MenuScreen(
                                 .shadow(2.dp, CircleShape)
                                 .clip(CircleShape)
                                 .background(Color.White)
-                                .border(2.5.dp, Color(0xFFFF7A00), CircleShape),
+                                .border(2.5.dp, Color(0xFFFF7A00), CircleShape)
+                                .clickable {
+                                    showAdminStatsDialog = true
+                                    viewModel.loadSupabaseStats()
+                                }
+                                .testTag("stats_logo_trigger"),
                             contentAlignment = Alignment.Center
                         ) {
                             Column(
@@ -619,10 +626,12 @@ fun MenuScreen(
                             prefs.edit().putStringSet("favorite_ids", newFavorites).apply()
                         },
                         onClick = {
-                            showDetailDialogForProduct = product
-                            viewModel.selectedItemQuantity.value = 1
-                            viewModel.selectedItemSauce.value = "BBQ"
-                            viewModel.selectedItemNote.value = ""
+                            if (product.available) {
+                                showDetailDialogForProduct = product
+                                viewModel.selectedItemQuantity.value = 1
+                                viewModel.selectedItemSauce.value = "BBQ"
+                                viewModel.selectedItemNote.value = ""
+                            }
                         }
                     )
                 }
@@ -644,10 +653,12 @@ fun MenuScreen(
                         prefs.edit().putStringSet("favorite_ids", newFavorites).apply()
                     },
                     onClick = {
-                        showDetailDialogForProduct = product
-                        viewModel.selectedItemQuantity.value = 1
-                        viewModel.selectedItemSauce.value = "BBQ"
-                        viewModel.selectedItemNote.value = ""
+                        if (product.available) {
+                            showDetailDialogForProduct = product
+                            viewModel.selectedItemQuantity.value = 1
+                            viewModel.selectedItemSauce.value = "BBQ"
+                            viewModel.selectedItemNote.value = ""
+                        }
                     }
                 )
             }
@@ -807,6 +818,14 @@ fun MenuScreen(
         }
 
         // 6. ACTION SHEETS & DIALOGS
+        // Admin Sales Stats Dialog
+        if (showAdminStatsDialog) {
+            AdminSalesStatsDialog(
+                viewModel = viewModel,
+                onDismiss = { showAdminStatsDialog = false }
+            )
+        }
+
         // Order History Dialog
         if (showHistoryDialog) {
             val dateFormater = remember { SimpleDateFormat("dd/MM/yyyy hh:mm a", Locale.getDefault()) }
@@ -1207,13 +1226,26 @@ fun FoodListItem(
     onFavoriteToggle: () -> Unit,
     onClick: () -> Unit
 ) {
+    val isAvailable = product.available
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 6.dp)
-            .shadow(elevation = 1.dp, shape = RoundedCornerShape(20.dp))
-            .border(BorderStroke(1.dp, Color(0xFFE8DED5)), RoundedCornerShape(20.dp)) // Fine border matching picture
-            .clickable(onClick = onClick)
+            .shadow(elevation = if (isAvailable) 1.dp else 0.dp, shape = RoundedCornerShape(20.dp))
+            .border(
+                BorderStroke(
+                    1.dp,
+                    if (isAvailable) Color(0xFFE8DED5) else Color(0xFFE0E0E0)
+                ),
+                RoundedCornerShape(20.dp)
+            )
+            .then(
+                if (isAvailable) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier.alpha(0.55f)
+                }
+            )
             .testTag("food_card_${product.id}"),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         shape = RoundedCornerShape(20.dp)
@@ -1250,14 +1282,34 @@ fun FoodListItem(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
-                Text(
-                    text = product.name,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1B1B1B),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = product.name,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1B1B1B),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    if (!isAvailable) {
+                        Box(
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .background(Color(0xFFFFEBEE), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "Agotado",
+                                color = Color(0xFFC62828),
+                                fontSize = 8.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = product.description,
@@ -1311,14 +1363,14 @@ fun FoodListItem(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFFF7A00))
-                    .shadow(1.dp, CircleShape),
+                    .background(if (isAvailable) Color(0xFFFF7A00) else Color(0xFFE0E0E0))
+                    .shadow(if (isAvailable) 1.dp else 0.dp, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "Añadir al carrito",
-                    tint = Color.White,
+                    contentDescription = if (isAvailable) "Añadir al carrito" else "Agotado",
+                    tint = if (isAvailable) Color.White else Color(0xFF9E9E9E),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -1731,6 +1783,337 @@ fun FoodCustomizerDialog(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun AdminSalesStatsDialog(
+    viewModel: FoodViewModel,
+    onDismiss: () -> Unit
+) {
+    val stats = viewModel.salesStats
+    val isLoading = viewModel.isLoadingStats
+    val error = viewModel.statsError
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .padding(horizontal = 4.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Estadísticas de Venta 📊",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1B1B1B)
+                        )
+                        Text(
+                            text = "Métricas desde Supabase",
+                            fontSize = 12.sp,
+                            color = Color(0xFF6B6B6B)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(Color(0xFFF5F5F5), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = Color(0xFF1B1B1B),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                HorizontalDivider(color = Color(0xFFEEEEEE), thickness = 1.dp)
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                if (isLoading) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = Color(0xFFFF7A00))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Descargando datos...",
+                                fontSize = 14.sp,
+                                color = Color(0xFF6B6B6B),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                } else if (error != null) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = "⚠️ Error de conexión",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFC62828)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = error,
+                                fontSize = 12.sp,
+                                color = Color(0xFF6B6B6B),
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = { viewModel.loadSupabaseStats() },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF7A00)),
+                                shape = CircleShape
+                            ) {
+                                Text("Reintentar", color = Color.White)
+                            }
+                        }
+                    }
+                } else if (stats != null) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        // Section: Today KPIs
+                        Text(
+                            text = "PEDIDOS DE HOY",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF7A00),
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            StatCard(
+                                modifier = Modifier.weight(1f),
+                                emoji = "📦",
+                                title = "Pedidos",
+                                value = stats.ordersToday.toString(),
+                                bgColor = Color(0xFFFFE0B2)
+                            )
+                            StatCard(
+                                modifier = Modifier.weight(1.1f),
+                                emoji = "💰",
+                                title = "Total Hoy",
+                                value = String.format(Locale.US, "$%.2f", stats.totalRevenueToday),
+                                bgColor = Color(0xFFE8F5E9)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        StatCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            emoji = "🎫",
+                            title = "Ticket Promedio",
+                            value = String.format(Locale.US, "$%.2f", stats.averageTicketToday),
+                            bgColor = Color(0xFFE3F2FD)
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Section: Leaderboards
+                        Text(
+                            text = "RANGOS Y TOP RECONOCIMIENTOS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF7A00),
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Product Leaderboard
+                        LeaderboardItem(
+                            emoji = "👑",
+                            title = "Producto más vendido",
+                            name = stats.bestSellingProduct ?: "Ninguno todavía",
+                            countText = if (stats.bestSellingProductCount > 0) "${stats.bestSellingProductCount} uds" else ""
+                        )
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Municipality Leaderboard
+                        LeaderboardItem(
+                            emoji = "🛵",
+                            title = "Municipio de mayor demanda",
+                            name = stats.topMunicipality ?: "Ninguno todavía",
+                            countText = if (stats.topMunicipalityCount > 0) "${stats.topMunicipalityCount} ped" else ""
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Section: Cumulative / Historical
+                        Text(
+                            text = "TOTALES HISTÓRICOS",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFFF7A00),
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Total pedidos", fontSize = 11.sp, color = Color(0xFF888888))
+                                Text(stats.totalOrdersAllTime.toString(), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF1B1B1B))
+                            }
+                            Column(modifier = Modifier.weight(1.2f)) {
+                                Text("Total acumulado", fontSize = 11.sp, color = Color(0xFF888888))
+                                Text(String.format(Locale.US, "$%.2f", stats.totalRevenueAllTime), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color(0xFF2E7D32))
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+                    }
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Button(
+                            onClick = { viewModel.loadSupabaseStats() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF7A00)),
+                            shape = CircleShape
+                        ) {
+                            Text("Cargar estadísticas", color = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun StatCard(
+    emoji: String,
+    title: String,
+    value: String,
+    bgColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFCF9F8)),
+        border = BorderStroke(1.dp, Color(0xFFE8DED5))
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .background(bgColor, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(emoji, fontSize = 16.sp)
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(text = title, fontSize = 10.sp, color = Color(0xFF888888), fontWeight = FontWeight.SemiBold)
+                Text(text = value, fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color(0xFF1B1B1B))
+            }
+        }
+    }
+}
+
+@Composable
+fun LeaderboardItem(
+    emoji: String,
+    title: String,
+    name: String,
+    countText: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFFCF9F8), RoundedCornerShape(16.dp))
+            .border(1.dp, Color(0xFFE8DED5), RoundedCornerShape(16.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .background(Color(0xFFFFF3E0), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(emoji, fontSize = 15.sp)
+            }
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(text = title, fontSize = 9.sp, color = Color(0xFF888888), fontWeight = FontWeight.Bold)
+                Text(
+                    text = name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1B1B1B),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        if (countText.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFFFFECB3), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = countText,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF7F5F00)
+                )
             }
         }
     }
