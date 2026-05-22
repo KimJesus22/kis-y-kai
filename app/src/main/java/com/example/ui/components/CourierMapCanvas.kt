@@ -39,11 +39,11 @@ fun CourierMapCanvas(
     status: String,
     modifier: Modifier = Modifier
 ) {
-    // Reference coordinates
+    // Coordenadas de referencia
     val storeLat = 20.3705
     val storeLng = -101.0638
 
-    // Flashing animations for beacons and icons
+    // Animaciones de parpadeo para balizas e iconos
     val infiniteTransition = rememberInfiniteTransition(label = "beacon")
     val pulseRadius by infiniteTransition.animateFloat(
         initialValue = 10f,
@@ -83,30 +83,30 @@ fun CourierMapCanvas(
             val width = size.width
             val height = size.height
 
-            // Coordinate mapping helper: mapping lat/lng to screen coordinates (X, Y)
-            // Bounds encompassing Jaral del Progreso, Valle de Santiago, and Cortazar
+            // Ayudante de mapeo de coordenadas: mapeo de lat/lng a coordenadas de pantalla (X, Y)
+            // Límites que abarcan Jaral del Progreso, Valle de Santiago y Cortazar
             val minLat = 20.3500
             val maxLat = 20.5000
             val minLng = -101.2100
             val maxLng = -100.9300
 
             fun mapToScreen(lat: Double, lng: Double): Offset {
-                // If coordinates are NaN, clearly omitted, default, or zero, fallback to store coordinates of Jaral
+                // Si las coordenadas son NaN, omitidas, por defecto o cero, usar las coordenadas de la tienda en Jaral como respaldo
                 val isLatInvalid = lat.isNaN() || lat.isInfinite() || lat < 1.0
                 val isLngInvalid = lng.isNaN() || lng.isInfinite() || lng > -10.0
                 val safeLat = if (isLatInvalid) storeLat else lat
                 val safeLng = if (isLngInvalid) storeLng else lng
 
-                // Constraint clamping to prevent wild native Skia path/dash allocation crashes at extreme coordinates
+                // Restricción de sujeción (clamping) para evitar errores de asignación de Skia con coordenadas extremas
                 val clampedLat = safeLat.coerceIn(minLat, maxLat)
                 val clampedLng = safeLng.coerceIn(minLng, maxLng)
 
-                // Latitude: maxLat maps to 0 (top), minLat maps to height (bottom)
+                // Latitud: maxLat mapea a 0 (superior), minLat mapea a height (inferior)
                 val y = height - ((clampedLat - minLat) / (maxLat - minLat) * height).toFloat()
-                // Longitude: minLng maps to 0 (left), maxLng maps to width (right)
+                // Longitud: minLng mapea a 0 (izquierda), maxLng mapea a width (derecha)
                 val x = ((clampedLng - minLng) / (maxLng - minLng) * width).toFloat()
 
-                // Final safety check to avoid returning NaN/Infinite offsets
+                // Comprobación de seguridad final para evitar devolver offsets NaN/Infinitos
                 val safeX = if (x.isNaN() || x.isInfinite()) 0f else x
                 val safeY = if (y.isNaN() || y.isInfinite()) 0f else y
 
@@ -119,7 +119,7 @@ fun CourierMapCanvas(
             val pCourier = mapToScreen(courierLat, courierLng)
             val pDest = mapToScreen(destLat, destLng)
 
-            // 1. Draw grid / coordinate markings (Aesthetic cartography grid)
+            // 1. Dibujar cuadrícula / marcas de coordenadas (cuadrícula cartográfica estética)
             for (i in 1..4) {
                 val gridY = (height / 5) * i
                 val gridX = (width / 5) * i
@@ -139,8 +139,8 @@ fun CourierMapCanvas(
                 )
             }
 
-            // 2. Draw highway roads
-            // Road Jaral -> Valle de Santiago
+            // 2. Dibujar carreteras principales
+            // Carretera Jaral -> Valle de Santiago
             drawLine(
                 color = outlineVal.copy(alpha = 0.35f),
                 start = pStore,
@@ -155,7 +155,7 @@ fun CourierMapCanvas(
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f))
             )
 
-            // Road Jaral -> Cortazar
+            // Carretera Jaral -> Cortazar
             drawLine(
                 color = outlineVal.copy(alpha = 0.35f),
                 start = pStore,
@@ -170,7 +170,7 @@ fun CourierMapCanvas(
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(12f, 12f))
             )
 
-            // 3. Draw active delivery trace history
+            // 3. Dibujar rastro histórico de entrega activa
             if (status == "EN_CAMINO" || status == "ENTREGADO") {
                 drawLine(
                     color = NeonPink,
@@ -181,7 +181,7 @@ fun CourierMapCanvas(
                 )
             }
 
-            // 4. Draw store landmark pulsing circle
+            // 4. Dibujar círculo pulsante de referencia de la tienda (landmark)
             drawCircle(
                 color = NeonPink.copy(alpha = pulseAlpha),
                 radius = pulseRadius,
@@ -198,7 +198,7 @@ fun CourierMapCanvas(
                 center = pStore
             )
 
-            // 5. Draw active customer destination landmark
+            // 5. Dibujar punto de referencia de destino del cliente activo (landmark)
             if (municipality != "JARAL_PROGRESO") {
                 drawCircle(
                     color = ElectricBlue.copy(alpha = pulseAlpha),
@@ -217,7 +217,7 @@ fun CourierMapCanvas(
                 )
             }
 
-            // 6. Draw other municipalities if not active (faded)
+            // 6. Dibujar otros municipios si no están activos (atenuados)
             if (municipality != "VALLE_SANTIAGO") {
                 drawCircle(color = onSurfaceVariantVal.copy(alpha = 0.4f), radius = 6f, center = pValle)
             }
@@ -225,7 +225,7 @@ fun CourierMapCanvas(
                 drawCircle(color = onSurfaceVariantVal.copy(alpha = 0.4f), radius = 6f, center = pCortazar)
             }
 
-            // 7. Draw courier status icon
+            // 7. Dibujar icono de estado del repartidor
             if (status == "EN_CAMINO") {
                 drawCircle(
                     color = HoneyGold.copy(alpha = 0.3f),
@@ -244,7 +244,7 @@ fun CourierMapCanvas(
                 )
             }
 
-            // Draw cartographic texts
+            // Dibujar textos cartográficos
             drawText(
                 textMeasurer = textMeasurer,
                 text = "Kis & Kei Local (Jaral)",
@@ -310,7 +310,7 @@ fun CourierMapCanvas(
             }
         }
 
-        // Overlay status board
+        // Superposición del tablero de estado (status board)
         Card(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -345,7 +345,7 @@ fun CourierMapCanvas(
             }
         }
 
-        // Compass Rose inside bottom corner
+        // Rosa de los vientos en la esquina inferior
         Icon(
             imageVector = Icons.Default.Navigation,
             contentDescription = "Compass",

@@ -4,7 +4,7 @@ import androidx.room.*
 import kotlinx.coroutines.flow.Flow
 
 // ----------------------------------------------------
-// ENTITIES
+// ENTIDADES
 // ----------------------------------------------------
 
 @Entity(tableName = "cart_items")
@@ -20,14 +20,14 @@ data class CartItemEntity(
 
 @Entity(tableName = "orders")
 data class OrderEntity(
-    @PrimaryKey val orderId: String, // e.g. #AKK-1234
-    val itemsJson: String, // String representation of ordered items
+    @PrimaryKey val orderId: String, // ej. #AKK-1234
+    val itemsJson: String, // Representación en cadena de los artículos pedidos
     val customerName: String,
     val phone: String,
-    val deliveryMethod: String, // "ENVIO" or "RECOGER"
+    val deliveryMethod: String, // "ENVIO" o "RECOGER"
     val municipality: String, // "VALLE_SANTIAGO", "CORTAZAR", "JARAL_PROGRESO"
     val address: String,
-    val paymentMethod: String, // "EFECTIVO" or "TRANSFERENCIA"
+    val paymentMethod: String, // "EFECTIVO" o "TRANSFERENCIA"
     val cashPayWith: Double = 0.0,
     val status: String, // "RECIBIDO", "PREPARANDO", "LISTO", "EN_CAMINO", "ENTREGADO"
     val timestamp: Long,
@@ -91,7 +91,7 @@ interface OrderDao {
 }
 
 // ----------------------------------------------------
-// CONVERTER OR HELPER
+// CONVERSOR O AYUDANTE
 // ----------------------------------------------------
 
 @Database(entities = [CartItemEntity::class, OrderEntity::class], version = 2, exportSchema = false)

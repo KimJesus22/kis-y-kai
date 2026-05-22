@@ -42,7 +42,7 @@ fun EmptyStateContent(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Icon container with modern layered background shadow
+            // Contenedor de icono con sombra de fondo por capas moderna
             Box(
                 modifier = Modifier
                     .size(96.dp)
@@ -64,7 +64,7 @@ fun EmptyStateContent(
             
             Spacer(modifier = Modifier.height(28.dp))
             
-            // Primary text (Main title)
+            // Texto primario (Título principal)
             Text(
                 text = title,
                 fontSize = 20.sp,
@@ -76,7 +76,7 @@ fun EmptyStateContent(
             
             Spacer(modifier = Modifier.height(10.dp))
             
-            // Secondary text (Sub-supporting text)
+            // Texto secundario (Texto de soporte secundario)
             Text(
                 text = subtitle,
                 fontSize = 14.sp,
@@ -88,7 +88,7 @@ fun EmptyStateContent(
             
             Spacer(modifier = Modifier.height(32.dp))
             
-            // Pill Rounded CTA Button (warm orange look conforming to design specs)
+            // Botón CTA redondeado tipo píldora (look naranja cálido conforme a especificaciones de diseño)
             Button(
                 onClick = onButtonClick,
                 shape = RoundedCornerShape(percent = 50),

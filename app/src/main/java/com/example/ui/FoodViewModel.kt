@@ -19,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlin.math.roundToInt
 
 // ----------------------------------------------------
-// UI STATES AND NOTIFICATIONS
+// ESTADOS DE UI Y NOTIFICACIONES
 // ----------------------------------------------------
 
 data class SimulatedNotification(
@@ -106,25 +106,25 @@ class FoodViewModel(
     }
 
 
-    // Product list (static catalog)
+    // Lista de productos (catálogo estático)
     var products by mutableStateOf<List<Product>>(repository.menuProducts)
         private set
 
-    // Shopping Cart reactive stream
+    // Flujo reactivo del Carrito de Compras
     val cartItems = repository.cartItems.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
-    // All historical orders reactive stream
+    // Flujo reactivo de todos los pedidos históricos
     val allOrders = repository.allOrders.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = emptyList()
     )
 
-    // Form states
+    // Estados del formulario
     var customerName = MutableStateFlow("")
         private set
     var customerPhone = MutableStateFlow("")
@@ -140,7 +140,7 @@ class FoodViewModel(
     var cashPayWith = MutableStateFlow("")
         private set
 
-    // Scheduled Order states
+    // Estados de Pedido Programado
     var scheduledMethod = MutableStateFlow("ASAP") // "ASAP" or "LATER"
         private set
     var scheduledDelay = MutableStateFlow("30 min") // "30 min", "45 min", "1 hora", "1.5 horas", "2 horas"
@@ -148,25 +148,25 @@ class FoodViewModel(
     var scheduledNote = MutableStateFlow("")
         private set
 
-    // Courier Tip states
+    // Estados de Propina para el Repartidor
     var tipMethod = MutableStateFlow("NONE") // "NONE", "10", "15", "20", "CUSTOM"
         private set
     var customTipValue = MutableStateFlow("")
         private set
 
-    // Active order being tracked
+    // Pedido activo que está siendo rastreado
     var activeOrderId = MutableStateFlow<String?>(null)
         private set
 
-    // Real-time Driver GPS active state
+    // Estado activo del GPS del Repartidor en tiempo real
     var isRiderGpsActive = MutableStateFlow(false)
         private set
 
-    // Notification Feed (Simulates push delivery states)
+    // Feed de Notificaciones (Simula estados de entrega push)
     private val _notifications = MutableStateFlow<List<SimulatedNotification>>(emptyList())
     val notifications: StateFlow<List<SimulatedNotification>> = _notifications.asStateFlow()
 
-    // Active tracking order flow
+    // Flujo de seguimiento de pedido activo
     val activeOrder: StateFlow<OrderEntity?> = activeOrderId.flatMapLatest { id ->
         if (id == null) flowOf(null)
         else repository.getOrderById(id)
@@ -176,7 +176,7 @@ class FoodViewModel(
         initialValue = null
     )
 
-    // Live calculations for shipping total
+    // Cálculos en vivo para el total de envío
     val deliveryFeeAndDetails = combine(deliveryMethod, selectedMunicipality) { method, muni ->
         if (method == "RECOGER") {
             repository.calculateDeliveryDetails("RECOGER")
@@ -189,7 +189,7 @@ class FoodViewModel(
         initialValue = repository.calculateDeliveryDetails("VALLE_SANTIAGO")
     )
 
-    // Item Selection States
+    // Estados de Selección de Artículos
     val selectedItemQuantity = MutableStateFlow(1)
     val selectedItemSauce = MutableStateFlow("BBQ")
     val selectedItemNote = MutableStateFlow("")
@@ -223,7 +223,7 @@ class FoodViewModel(
     }
 
     // ----------------------------------------------------
-    // ACTIONS
+    // ACCIONES
     // ----------------------------------------------------
 
     fun setCustomerName(v: String) { customerName.value = v }
@@ -255,7 +255,7 @@ class FoodViewModel(
         list.add(0, SimulatedNotification(title, text, timeStr))
         _notifications.value = list
 
-        // Deliver actual high-priority system status notification acting as a push notice
+        // Entregar la notificación de estado del sistema de alta prioridad real actuando como un aviso push
         NotificationHelper.showNotification(appContext, title, text)
     }
 
@@ -265,7 +265,7 @@ class FoodViewModel(
         val note = selectedItemNote.value
         repository.addToCart(product, qty, sauce, note)
         
-        // Reset selections
+        // Restablecer selecciones
         selectedItemQuantity.value = 1
         selectedItemSauce.value = "BBQ"
         selectedItemNote.value = ""
@@ -281,7 +281,7 @@ class FoodViewModel(
 
     fun repeatOrder(order: OrderEntity, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
-            // Clear current cart items first for a clean repeat
+            // Limpiar los artículos del carrito actual primero para una repetición limpia
             repository.clearCart()
             
             val text = order.itemsJson
@@ -372,7 +372,7 @@ class FoodViewModel(
                     cartItems = cartList
                 )
 
-                // Try to sync with Supabase in background
+                // Intentar sincronizar con Supabase en segundo plano
                 var isSynced = false
                 try {
                     val supabaseItems = cartList.map { item ->
@@ -422,7 +422,7 @@ class FoodViewModel(
 
                 activeOrderId.value = order.orderId
                 
-                // Push Notification with sync state indication
+                // Notificación Push con indicación del estado de sincronización
                 addNotification(
                     title = if (isSynced) "Pedido Recibido ✨" else "Pedido Recibido 📝",
                     text = if (isSynced) {
@@ -432,14 +432,14 @@ class FoodViewModel(
                     }
                 )
 
-                // Clear Cart and reset checkout/tip states
+                // Limpiar el carrito y restablecer estados de pago/propina
                 repository.clearCart()
                 tipMethod.value = "NONE"
                 customTipValue.value = ""
                 scheduledMethod.value = "ASAP"
                 scheduledNote.value = ""
 
-                // Start life cycle simulation
+                // Iniciar simulación del ciclo de vida
                 startTrackingSimulation(order.orderId)
 
                 withContext(Dispatchers.Main) {
@@ -550,11 +550,11 @@ class FoodViewModel(
     }
 
     // ----------------------------------------------------
-    // REPARTIDOR TRACKING SIMULATION ENGINE
+    // MOTOR DE SIMULACIÓN DE RASTREO DE REPARTIDOR
     // ----------------------------------------------------
 
     fun forceStateAdvance() {
-        // Fast forward the courier simulation
+        // Adelantar la simulación del repartidor
         val order = activeOrder.value ?: return
         viewModelScope.launch {
             val nextStatus = when (order.status) {
@@ -637,12 +637,12 @@ class FoodViewModel(
                             }
                         }
                     }.onFailure {
-                        // Fail silently or handle connection timeout
+                        // Fallar silenciosamente o manejar el tiempo de espera de conexión
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-                delay(5000) // Poll every 5 seconds
+                delay(5000) // Consultar cada 5 segundos
             }
         }
     }
@@ -650,19 +650,19 @@ class FoodViewModel(
     private fun startTrackingSimulation(orderId: String) {
         trackingSimulationJob?.cancel()
         trackingSimulationJob = viewModelScope.launch {
-            // Stage 1: Received -> Prep (10s)
+            // Etapa 1: Recibido -> Prep (10s)
             delay(10000)
             advanceSimulationTo(orderId, "PREPARANDO")
 
-            // Stage 2: Prep -> Ready (12s)
+            // Etapa 2: Prep -> Listo (12s)
             delay(12000)
             advanceSimulationTo(orderId, "LISTO")
 
-            // Stage 3: Ready -> En camino (6s)
+            // Etapa 3: Listo -> En camino (6s)
             delay(6000)
             val order = repository.getOrderById(orderId).first() ?: return@launch
             if (order.deliveryMethod == "RECOGER") {
-                // Pick up stays in LISTO until pick-up complete
+                // Para recoger se queda en LISTO hasta que se complete la recogida
                 delay(12000)
                 advanceSimulationTo(orderId, "ENTREGADO")
                 return@launch
@@ -670,7 +670,7 @@ class FoodViewModel(
 
             advanceSimulationTo(orderId, "EN_CAMINO")
 
-            // Stage 4: En camino movement loop (6 Steps from Store to Destination)
+            // Etapa 4: Bucle de movimiento En camino (8 pasos desde la tienda hasta el destino)
             val startLat = repository.latStore
             val startLng = repository.lngStore
             val endLat = order.destinationLat
@@ -678,7 +678,7 @@ class FoodViewModel(
             val steps = 8
 
             for (i in 1..steps) {
-                delay(5000) // update every 5 seconds
+                delay(5000) // actualizar cada 5 segundos
                 val fraction = i.toDouble() / steps
                 val currentLat = startLat + (endLat - startLat) * fraction
                 val currentLng = startLng + (endLng - startLng) * fraction
@@ -722,10 +722,10 @@ class FoodViewModel(
     @android.annotation.SuppressLint("MissingPermission")
     private fun startRiderGpsTracking() {
         val orderId = activeOrderId.value ?: return
-        // Cancel standard timeline artificial tracking job since we are manually delivering via real GPS coordinate injection!
+        // Cancelar el trabajo de rastreo artificial de la línea de tiempo estándar, ya que estamos entregando manualmente mediante la inyección de coordenadas GPS reales.
         trackingSimulationJob?.cancel()
 
-        // Set state to EN_CAMINO if it is currently in a preparatory state
+        // Establecer el estado en EN_CAMINO si se encuentra actualmente en un estado preparatorio
         viewModelScope.launch {
             val order = repository.getOrderById(orderId).first()
             if (order != null && (order.status == "RECIBIDO" || order.status == "PREPARANDO" || order.status == "LISTO")) {
@@ -735,7 +735,7 @@ class FoodViewModel(
 
         val locManager = appContext.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager ?: return
         
-        // Ensure standard updates are cleaned before initiating new tracking
+        // Asegurarse de que las actualizaciones estándar se limpien antes de iniciar un nuevo rastreo
         stopRiderGpsTracking()
 
         val listener = object : android.location.LocationListener {
@@ -745,7 +745,7 @@ class FoodViewModel(
                     if (currentId != null) {
                         repository.updateCourierLocation(currentId, location.latitude, location.longitude)
                         
-                        // Check if we are extremely close (less than 100 meters) to the delivery destination
+                        // Comprobar si estamos extremadamente cerca (menos de 100 metros) del destino de entrega
                         val destLoc = repository.getOrderById(currentId).first()
                         if (destLoc != null) {
                             val dist = repository.calculateHaversineDistance(
@@ -788,7 +788,7 @@ class FoodViewModel(
                 )
             }
             
-            // Pop immediate fix if location is already locked
+            // Proporcionar una corrección inmediata si la ubicación ya está bloqueada
             val lastGps = locManager.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
             val lastNet = locManager.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
             val bestFix = lastGps ?: lastNet
@@ -823,7 +823,7 @@ class FoodViewModel(
 }
 
 // ----------------------------------------------------
-// FACTORY
+// FACTORÍA
 // ----------------------------------------------------
 
 class FoodViewModelFactory(private val context: Context) : ViewModelProvider.Factory {

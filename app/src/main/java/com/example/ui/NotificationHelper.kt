@@ -30,7 +30,7 @@ object NotificationHelper {
     }
 
     fun showNotification(context: Context, title: String, text: String) {
-        // Prepare Channel first
+        // Preparar el canal primero
         createNotificationChannel(context)
 
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -54,8 +54,8 @@ object NotificationHelper {
 
         try {
             val manager = NotificationManagerCompat.from(context)
-            // Note: Since Android 13+, POST_NOTIFICATIONS permission should be checked.
-            // On older or if not granted, standard systems compile fine and gracefully suppress.
+            // Nota: Desde Android 13+, se debe verificar el permiso POST_NOTIFICATIONS.
+            // En versiones anteriores o si no se concede, los sistemas estándar compilan bien y suprimen la notificación con gracia.
             manager.notify(NOTIFICATION_ID, builder.build())
         } catch (e: Exception) {
             e.printStackTrace()

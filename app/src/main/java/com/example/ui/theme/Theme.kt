@@ -23,8 +23,8 @@ private val KisKeiColorScheme = lightColorScheme(
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = false, // High Density theme defaults to standard light/lavender theme
-    dynamicColor: Boolean = false, // Disable system dynamic color so the custom restaurant identity is locked
+    darkTheme: Boolean = false, // El tema de alta densidad por defecto es el tema claro/lavanda estándar
+    dynamicColor: Boolean = false, // Deshabilitar el color dinámico del sistema para mantener la identidad visual del restaurante
     content: @Composable () -> Unit,
 ) {
     MaterialTheme(

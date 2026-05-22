@@ -49,7 +49,7 @@ fun TrackingScreen(
     val riderGpsActive by viewModel.isRiderGpsActive.collectAsState()
     var showConfirmationCard by remember { mutableStateOf(true) }
 
-    // Brand color palette matching visual design specifications
+    // Paleta de colores de la marca que coincide con las especificaciones de diseño visual
     val primaryOrange = Color(0xFFFF6D00)
     val lightBorderColor = Color(0xFFE8DED5)
     val premiumCreamBg = Color(0xFFFCF9F8)
@@ -58,7 +58,7 @@ fun TrackingScreen(
     val secondaryPanelBg = Color(0xFFFFF4EC)
     val successGreen = Color(0xFF2E7D32)
 
-    // Request permissions launcher for GPS location tracking
+    // Lanzador de solicitud de permisos para el seguimiento de la ubicación GPS
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
@@ -72,7 +72,7 @@ fun TrackingScreen(
         }
     }
 
-    // Request permissions launcher for POST_NOTIFICATIONS (Android 13+)
+    // Lanzador de solicitud de permisos para POST_NOTIFICATIONS (Android 13+)
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -83,7 +83,7 @@ fun TrackingScreen(
         }
     }
 
-    // Automatically request Notification permission on startup with a brief delay
+    // Solicitar automáticamente el permiso de notificaciones al inicio con un breve retraso
     LaunchedEffect(Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             try {
@@ -103,7 +103,7 @@ fun TrackingScreen(
         Column(
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header Section
+            // Sección de Encabezado
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -114,7 +114,7 @@ fun TrackingScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Circular close/back button
+                    // Botón circular de cerrar/atrás
                     Box(
                         modifier = Modifier
                             .size(42.dp)
@@ -151,7 +151,7 @@ fun TrackingScreen(
                         )
                     }
 
-                    // "Acelerar" badge button (Debug simulation trigger)
+                    // Botón de insignia "Acelerar" (disparador de simulación de depuración)
                     Box(
                         modifier = Modifier
                             .shadow(elevation = 1.dp, shape = CircleShape)
@@ -187,7 +187,7 @@ fun TrackingScreen(
             if (order == null) {
                 val activeOrderId by viewModel.activeOrderId.collectAsState()
                 if (activeOrderId == null) {
-                    // Empty state centered view when no order exists
+                    // Vista centrada de estado vacío cuando no existe ningún pedido
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -267,7 +267,7 @@ fun TrackingScreen(
                         }
                     }
                 } else {
-                    // Loading State
+                    // Estado de Carga
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -387,7 +387,7 @@ fun TrackingScreen(
                         }
                     }
 
-                    // 1. MAP CANVAS CARD
+                    // 1. TARJETA DE MAPA CANVAS (LIENZO)
                     item {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Text(
@@ -425,7 +425,7 @@ fun TrackingScreen(
                                             .testTag("map_canvas")
                                     )
 
-                                    // Status info label overlaid on the map (top-left)
+                                    // Etiqueta de información de estado superpuesta en el mapa (arriba a la izquierda)
                                     Box(
                                         modifier = Modifier
                                             .align(Alignment.TopStart)
@@ -469,7 +469,7 @@ fun TrackingScreen(
                                         }
                                     }
 
-                                    // Compass centring action button bottom-right visual overlay
+                                    // Botón de acción de centrado de brújula en la esquina inferior derecha (superposición visual)
                                     Box(
                                         modifier = Modifier
                                             .align(Alignment.BottomEnd)
@@ -496,7 +496,7 @@ fun TrackingScreen(
                         }
                     }
 
-                    // LIVE GPS SIMULATOR CONTROLS
+                    // CONTROLES DEL SIMULADOR DE GPS EN VIVO
                     if (ord.deliveryMethod == "ENVIO" && ord.status != "ENTREGADO") {
                         item {
                             Card(
@@ -585,7 +585,7 @@ fun TrackingScreen(
                         }
                     }
 
-                    // 2. TIMELINE PROGRESS CARD
+                    // 2. TARJETA DE PROGRESO DE LA LÍNEA DE TIEMPO
                     item {
                         Card(
                             modifier = Modifier
@@ -619,7 +619,7 @@ fun TrackingScreen(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
 
-                                // Dynamic Timeline
+                                // Línea de tiempo dinámica
                                 OrderProgressStateRowTimeline(
                                     activeStatus = ord.status,
                                     method = ord.deliveryMethod,
@@ -636,7 +636,7 @@ fun TrackingScreen(
                                     modifier = Modifier.padding(vertical = 12.dp)
                                 )
 
-                                // ETA / Courier Summary Row
+                                // Fila de resumen de ETA / Repartidor
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -649,7 +649,7 @@ fun TrackingScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        // Left: Tiempo estimado
+                                        // Izquierda: Tiempo estimado
                                         Row(
                                             modifier = Modifier.weight(1f),
                                             verticalAlignment = Alignment.CenterVertically
@@ -694,7 +694,7 @@ fun TrackingScreen(
 
                                         Spacer(modifier = Modifier.width(10.dp))
 
-                                        // Right: Repartidor asignado
+                                        // Derecha: Repartidor asignado
                                         Row(
                                             modifier = Modifier.weight(1.1f),
                                             verticalAlignment = Alignment.CenterVertically
@@ -740,7 +740,7 @@ fun TrackingScreen(
                         }
                     }
 
-                    // 3. WHATSAPP COORDINATION CARD
+                    // 3. TARJETA DE COORDINACIÓN POR WHATSAPP
                     item {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF5E9)),
@@ -785,7 +785,7 @@ fun TrackingScreen(
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
                                 
-                                // Enviar Ticket por WhatsApp button matching specifications
+                                // Botón de Enviar Ticket por WhatsApp que coincide con las especificaciones
                                 Button(
                                     onClick = { sendWhatsAppOrderText(context, ord) },
                                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
@@ -826,7 +826,7 @@ fun TrackingScreen(
                         }
                     }
 
-                    // 4. DELIVERY DETAILS / PAYMENT CARD (Datos de Entrega / Pago)
+                    // 4. TARJETA DE DETALLES DE ENTREGA / PAGO
                     item {
                         Card(
                             modifier = Modifier
@@ -837,7 +837,7 @@ fun TrackingScreen(
                             shape = RoundedCornerShape(24.dp)
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
-                                // Title Row
+                                // Fila de Título
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -870,7 +870,7 @@ fun TrackingScreen(
                                     modifier = Modifier.padding(vertical = 12.dp)
                                 )
 
-                                // Row 1: Cliente: Name
+                                // Fila 1: Cliente: Nombre
                                 InfoItemRow(
                                     icon = Icons.Default.Person,
                                     label = "Cliente",
@@ -881,7 +881,7 @@ fun TrackingScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // Row 2: Teléfono: Phone
+                                // Fila 2: Teléfono: Teléfono
                                 InfoItemRow(
                                     icon = Icons.Default.Phone,
                                     label = "Teléfono",
@@ -892,7 +892,7 @@ fun TrackingScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // Row 3: Dirección: Address
+                                // Fila 3: Dirección: Dirección
                                 val hasBrackets = ord.address.contains("[")
                                 val cleanAddressLabel = if (hasBrackets) {
                                     val base = ord.address.substringBefore("[").trim()
@@ -953,7 +953,7 @@ fun TrackingScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // Row 4: Método de Pago
+                                // Fila 4: Método de Pago
                                 InfoItemRow(
                                     icon = Icons.Default.CreditCard,
                                     label = "Método de Pago",
@@ -964,7 +964,7 @@ fun TrackingScreen(
 
                                 Spacer(modifier = Modifier.height(14.dp))
 
-                                // Cash pay/exchange details if Cash Payment Method
+                                // Detalles de pago en efectivo/cambio si el método de pago es Efectivo
                                 if (ord.paymentMethod == "EFECTIVO") {
                                     Box(
                                         modifier = Modifier
@@ -1005,7 +1005,7 @@ fun TrackingScreen(
                                     modifier = Modifier.padding(vertical = 12.dp)
                                 )
 
-                                // Row: Alimentos Ordenados title
+                                // Fila: Título de Alimentos Ordenados
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1034,7 +1034,7 @@ fun TrackingScreen(
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
-                                // Parse foods and render mini cards
+                                // Analizar alimentos y renderizar mini tarjetas
                                 val parts = ord.itemsJson.split("; ").filter { it.isNotBlank() }
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -1059,7 +1059,7 @@ fun TrackingScreen(
             }
         }
 
-        // Return Home modern sticky bottom button styled as beautiful orange Pill-shaped card
+        // Botón fijo moderno de volver al inicio en la parte inferior, diseñado como una hermosa tarjeta naranja tipo píldora
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -1101,7 +1101,7 @@ fun TrackingScreen(
     }
 }
 
-// Beautiful helper row for Delivery particulars
+// Hermosa fila de ayuda para particulares de entrega
 @Composable
 fun InfoItemRow(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -1151,13 +1151,13 @@ fun InfoItemRow(
     }
 }
 
-// Beautiful horizontal food cards per ordered item, loaded dynamically with a quality placeholder Unsplash wings photo
+// Hermosas tarjetas de comida horizontales por artículo pedido, cargadas dinámicamente con una foto de alitas de Unsplash de calidad como marcador de posición
 @Composable
 fun ProductItemRowBubble(
     itemText: String,
     primaryOrange: Color
 ) {
-    // Unsplash BBQ chicken wings image URL
+    // URL de imagen de alitas de pollo BBQ de Unsplash
     val alitasUrl = "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?auto=format&fit=crop&q=80&w=200"
 
     Box(
@@ -1281,7 +1281,7 @@ fun OrderProgressStateRowTimeline(
                     .fillMaxWidth()
                     .height(IntrinsicSize.Min)
             ) {
-                // Left progress node and vertical timeline line creator
+                // Nodo de progreso izquierdo y creador de línea vertical de la línea de tiempo
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -1290,7 +1290,7 @@ fun OrderProgressStateRowTimeline(
                 ) {
                     Spacer(modifier = Modifier.height(3.dp))
 
-                    // Double circle node or filled check node based on active status
+                    // El nodo de círculo doble o el nodo de verificación lleno se basa en el estado activo
                     if (isPassed) {
                         Box(
                             modifier = Modifier
@@ -1339,7 +1339,7 @@ fun OrderProgressStateRowTimeline(
                                     .background(primaryOrange)
                             )
                         } else {
-                            // Dotted timeline line
+                            // Línea de tiempo punteada
                             Canvas(
                                 modifier = Modifier
                                     .weight(1f)
@@ -1360,7 +1360,7 @@ fun OrderProgressStateRowTimeline(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Left element visual icon representer
+                // Representador de icono visual del elemento izquierdo
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -1378,7 +1378,7 @@ fun OrderProgressStateRowTimeline(
 
                 Spacer(modifier = Modifier.width(14.dp))
 
-                // Heading titles and subtitles text information
+                // Títulos de encabezado e información de texto de subtítulos
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -1578,7 +1578,7 @@ fun sendWhatsAppOrderText(context: Context, order: OrderEntity) {
     try {
         val formattedMsg = buildWhatsAppTicket(order)
 
-        // Create WhatsApp intent targeted directly to Ulices (4731841964)
+        // Crear el intent de WhatsApp dirigido directamente a Ulices (4731841964)
         val phoneNo = "524731841964" // 52 country code for Mexico + 10 digits
         val uri = Uri.parse("https://api.whatsapp.com/send?phone=$phoneNo&text=" + Uri.encode(formattedMsg))
         val intent = Intent(Intent.ACTION_VIEW, uri)
