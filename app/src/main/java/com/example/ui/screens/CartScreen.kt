@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -51,11 +53,27 @@ fun CartScreen(
     val cashPayWith by viewModel.cashPayWith.collectAsState()
     val deliveryDetails by viewModel.deliveryFeeAndDetails.collectAsState()
 
+    val scheduledMethod by viewModel.scheduledMethod.collectAsState()
+    val scheduledDelay by viewModel.scheduledDelay.collectAsState()
+    val scheduledNote by viewModel.scheduledNote.collectAsState()
+
+    val tipMethod by viewModel.tipMethod.collectAsState()
+    val customTipValue by viewModel.customTipValue.collectAsState()
+
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
+    var attemptedSubmit by remember { mutableStateOf(false) }
+
     val subtotal = cartList.sumOf { it.price * it.quantity }
-    val total = subtotal + deliveryDetails.deliveryFee
+    val tipAmount = when (tipMethod) {
+        "10" -> 10.0
+        "15" -> 15.0
+        "20" -> 20.0
+        "CUSTOM" -> customTipValue.toDoubleOrNull() ?: 0.0
+        else -> 0.0
+    }
+    val total = subtotal + deliveryDetails.deliveryFee + tipAmount
 
     val isEnvio = deliveryMethod == "ENVIO"
     val isRecoger = deliveryMethod == "RECOGER"
@@ -609,6 +627,18 @@ fun CartScreen(
                                         }
                                     }
 
+                                    val hasMuniError = attemptedSubmit && isEnvio && municipality.isBlank()
+                                    if (hasMuniError) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "⚠️ Selecciona tu municipio de entrega.",
+                                            color = Color(0xFFD32F2F),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(start = 4.dp)
+                                        )
+                                    }
+
                                     Spacer(modifier = Modifier.height(24.dp))
 
                                     // Title with Home Icon
@@ -640,6 +670,7 @@ fun CartScreen(
                                     }
 
                                     // Multiline Address Textfield with Characters Counter
+                                    val hasAddressError = attemptedSubmit && isEnvio && address.isBlank()
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
@@ -652,6 +683,7 @@ fun CartScreen(
                                                     viewModel.setDeliveryAddress(it)
                                                 }
                                             },
+                                            isError = hasAddressError,
                                             placeholder = {
                                                 Text(
                                                     text = "Calle 5 de Mayo #123, Colonia Centro,\nValle de Santiago, Guanajuato, C.P. 38400",
@@ -687,6 +719,17 @@ fun CartScreen(
                                                 .align(Alignment.BottomEnd)
                                                 .padding(bottom = 12.dp, end = 16.dp),
                                             fontWeight = FontWeight.Medium
+                                        )
+                                    }
+
+                                    if (hasAddressError) {
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = "⚠️ Escribe tu dirección completa.",
+                                            color = Color(0xFFD32F2F),
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            modifier = Modifier.padding(start = 4.dp)
                                         )
                                     }
 
@@ -850,6 +893,175 @@ fun CartScreen(
                         }
                     }
 
+                    // 3.5. Horario del Pedido Section
+                    item {
+                        SectionHeader(icon = Icons.Default.Schedule, title = "HORARIO DEL PEDIDO")
+                    }
+
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
+                                .border(BorderStroke(1.2.dp, borderSoft), RoundedCornerShape(24.dp)),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(24.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                val isAsap = scheduledMethod == "ASAP"
+                                // "Lo antes posible" Card Option
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(
+                                            BorderStroke(
+                                                if (isAsap) 2.dp else 1.2.dp,
+                                                if (isAsap) primaryOrange else borderSoft
+                                            ),
+                                            RoundedCornerShape(16.dp)
+                                        )
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (isAsap) Color(0xFFFFFBF9) else Color.White)
+                                        .clickable { viewModel.setScheduledMethod("ASAP") }
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isAsap,
+                                        onClick = { viewModel.setScheduledMethod("ASAP") },
+                                        colors = RadioButtonDefaults.colors(selectedColor = primaryOrange)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Lo antes posible",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = textPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Prepararemos tu pedido en cuanto confirmes.",
+                                            fontSize = 12.sp,
+                                            color = textSecondary
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(12.dp))
+
+                                val isLater = scheduledMethod == "LATER"
+                                // "Programar para más tarde" Card Option
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .border(
+                                            BorderStroke(
+                                                if (isLater) 2.dp else 1.2.dp,
+                                                if (isLater) primaryOrange else borderSoft
+                                            ),
+                                            RoundedCornerShape(16.dp)
+                                        )
+                                        .clip(RoundedCornerShape(16.dp))
+                                        .background(if (isLater) Color(0xFFFFFBF9) else Color.White)
+                                        .clickable { viewModel.setScheduledMethod("LATER") }
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    RadioButton(
+                                        selected = isLater,
+                                        onClick = { viewModel.setScheduledMethod("LATER") },
+                                        colors = RadioButtonDefaults.colors(selectedColor = primaryOrange)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Programar para más tarde",
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = textPrimary
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = "Elige una hora aproximada.",
+                                            fontSize = 12.sp,
+                                            color = textSecondary
+                                        )
+                                    }
+                                }
+
+                                if (isLater) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Elige en cuánto tiempo aproximado:",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = textPrimary
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Timing Chips in horizontal scrollable row
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .horizontalScroll(rememberScrollState()),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        val timingOptions = listOf("30 min", "45 min", "1 hora", "1.5 horas", "2 horas")
+                                        timingOptions.forEach { option ->
+                                            val isSelected = scheduledDelay == option
+                                            Box(
+                                                modifier = Modifier
+                                                    .border(
+                                                        BorderStroke(
+                                                            if (isSelected) 1.5.dp else 1.dp,
+                                                            if (isSelected) primaryOrange else borderSoft
+                                                        ),
+                                                        RoundedCornerShape(12.dp)
+                                                    )
+                                                    .clip(RoundedCornerShape(12.dp))
+                                                    .background(if (isSelected) Color(0xFFFFECE0) else Color.White)
+                                                    .clickable { viewModel.setScheduledDelay(option) }
+                                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = option,
+                                                    fontSize = 13.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                                                    color = if (isSelected) primaryOrange else textSecondary
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(16.dp))
+
+                                    // Nota de Horario
+                                    OutlinedTextField(
+                                        value = scheduledNote,
+                                        onValueChange = { viewModel.setScheduledNote(it) },
+                                        placeholder = { Text("Ej: Lo quiero para las 8:30 pm", color = textSecondary.copy(alpha = 0.5f)) },
+                                        label = { Text("Nota de horario (Opcional)", color = textSecondary, fontSize = 12.sp) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("input_scheduled_note"),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = Color(0xFFFCF9F8),
+                                            unfocusedContainerColor = Color(0xFFFCF9F8),
+                                            focusedBorderColor = primaryOrange,
+                                            unfocusedBorderColor = borderSoft,
+                                            focusedTextColor = textPrimary,
+                                            unfocusedTextColor = textPrimary
+                                        ),
+                                        singleLine = true
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     // 4. Contact Information Section
                     item {
                         SectionHeader(icon = Icons.Default.Person, title = "DATOS DE CONTACTO")
@@ -865,9 +1077,11 @@ fun CartScreen(
                             shape = RoundedCornerShape(24.dp)
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
+                                val hasNameError = attemptedSubmit && name.isBlank()
                                 OutlinedTextField(
                                     value = name,
                                     onValueChange = { viewModel.setCustomerName(it) },
+                                    isError = hasNameError,
                                     placeholder = { Text("Nombre completo", color = textSecondary.copy(alpha = 0.6f)) },
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -890,11 +1104,24 @@ fun CartScreen(
                                         )
                                     }
                                 )
+                                if (hasNameError) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "⚠️ Escribe tu nombre completo.",
+                                        color = Color(0xFFD32F2F),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
+
                                 Spacer(modifier = Modifier.height(12.dp))
 
+                                val hasPhoneError = attemptedSubmit && phone.isBlank()
                                 OutlinedTextField(
                                     value = phone,
                                     onValueChange = { viewModel.setCustomerPhone(it) },
+                                    isError = hasPhoneError,
                                     placeholder = { Text("Teléfono de contacto / WhatsApp", color = textSecondary.copy(alpha = 0.6f)) },
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                     modifier = Modifier
@@ -918,6 +1145,16 @@ fun CartScreen(
                                         )
                                     }
                                 )
+                                if (hasPhoneError) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "⚠️ Agrega un teléfono o WhatsApp de contacto.",
+                                        color = Color(0xFFD32F2F),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(start = 4.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1164,6 +1401,34 @@ fun CartScreen(
                                         ),
                                         singleLine = true
                                     )
+                                    if (cashPayWith.isBlank()) {
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Card(
+                                            colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF7F2)),
+                                            shape = RoundedCornerShape(12.dp),
+                                            border = BorderStroke(1.dp, Color(0xFFFFE3D1)),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(12.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Info,
+                                                    contentDescription = null,
+                                                    tint = primaryOrange,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "Puedes indicar con cuánto pagarás para preparar tu cambio.",
+                                                    color = orangeDarkText,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Medium
+                                                )
+                                            }
+                                        }
+                                    }
                                 } else {
                                     Spacer(modifier = Modifier.height(18.dp))
                                     Card(
@@ -1205,6 +1470,109 @@ fun CartScreen(
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+
+                    // 5.5. Propina para Repartidor Section
+                    item {
+                        SectionHeader(icon = Icons.Default.Payments, title = "PROPINA PARA REPARTIDOR")
+                    }
+
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .shadow(elevation = 1.dp, shape = RoundedCornerShape(24.dp))
+                                .border(BorderStroke(1.2.dp, borderSoft), RoundedCornerShape(24.dp)),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            shape = RoundedCornerShape(24.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(20.dp)) {
+                                Text(
+                                    text = "Apoya a tu repartidor",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = textPrimary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Opcional, pero siempre se agradece.",
+                                    fontSize = 12.sp,
+                                    color = textSecondary
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+
+                                // Tip options inside a horizontal scroll or grid
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val options = listOf(
+                                        "NONE" to "Sin propina",
+                                        "10" to "$10",
+                                        "15" to "$15",
+                                        "20" to "$20",
+                                        "CUSTOM" to "Otra"
+                                    )
+                                    options.forEach { (key, label) ->
+                                        val isSelected = tipMethod == key
+                                        Box(
+                                            modifier = Modifier
+                                                .border(
+                                                    BorderStroke(
+                                                        if (isSelected) 1.5.dp else 1.dp,
+                                                        if (isSelected) primaryOrange else borderSoft
+                                                    ),
+                                                    RoundedCornerShape(12.dp)
+                                                )
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .background(if (isSelected) Color(0xFFFFECE0) else Color.White)
+                                                .clickable { viewModel.setTipMethod(key) }
+                                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                fontSize = 13.sp,
+                                                fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                                                color = if (isSelected) primaryOrange else textSecondary
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (tipMethod == "CUSTOM") {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    OutlinedTextField(
+                                        value = customTipValue,
+                                        onValueChange = { newValue ->
+                                            if (newValue.all { it.isDigit() }) {
+                                                viewModel.setCustomTipValue(newValue)
+                                            }
+                                        },
+                                        placeholder = { Text("Ej: 25", color = textSecondary.copy(alpha = 0.5f)) },
+                                        label = { Text("Ingrese el monto ($)", color = textSecondary, fontSize = 12.sp) },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .testTag("input_custom_tip"),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedContainerColor = Color(0xFFFCF9F8),
+                                            unfocusedContainerColor = Color(0xFFFCF9F8),
+                                            focusedBorderColor = primaryOrange,
+                                            unfocusedBorderColor = borderSoft,
+                                            focusedTextColor = textPrimary,
+                                            unfocusedTextColor = textPrimary
+                                        ),
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                        ),
+                                        singleLine = true
+                                    )
                                 }
                             }
                         }
@@ -1269,6 +1637,25 @@ fun CartScreen(
                                         color = textPrimary
                                     )
                                 }
+                                if (tipAmount > 0.0) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "Propina para repartidor",
+                                            fontSize = 16.sp,
+                                            color = textSecondary
+                                        )
+                                        Text(
+                                            text = "$${tipAmount.toInt()} MXN",
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = textPrimary
+                                        )
+                                    }
+                                }
                                 HorizontalDivider(
                                     color = borderSoft,
                                     modifier = Modifier.padding(vertical = 16.dp)
@@ -1300,8 +1687,6 @@ fun CartScreen(
 
         // Fixed checkout button container at bottom
         if (cartList.isNotEmpty()) {
-            val isAddressValid = deliveryMethod == "RECOGER" || address.isNotBlank()
-
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -1309,20 +1694,42 @@ fun CartScreen(
                     .shadow(elevation = 12.dp, shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                     .background(
-                        if (isAddressValid) {
-                            Brush.horizontalGradient(
-                                colors = listOf(Color(0xFFFF8A00), Color(0xFFFF5200))
-                            )
-                        } else {
-                            Brush.horizontalGradient(
-                                colors = listOf(primaryOrange.copy(alpha = 0.5f), primaryOrange.copy(alpha = 0.5f))
-                            )
-                        }
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xFFFF8A00), Color(0xFFFF5200))
+                        )
                     )
-                    .clickable(enabled = isAddressValid) {
-                        viewModel.checkout(onComplete = { orderId ->
-                            onNavigateToTracking()
-                        })
+                    .clickable {
+                        attemptedSubmit = true
+
+                        val isNameError = name.isBlank()
+                        val isPhoneError = phone.isBlank()
+                        val isAddressError = isEnvio && address.isBlank()
+                        val isMunicipalityError = isEnvio && municipality.isBlank()
+                        val isCartEmptyError = cartList.isEmpty()
+
+                        if (isCartEmptyError) {
+                            android.widget.Toast.makeText(context, "Agrega al menos un producto para continuar.", android.widget.Toast.LENGTH_LONG).show()
+                        } else if (isNameError) {
+                            android.widget.Toast.makeText(context, "Escribe tu nombre completo.", android.widget.Toast.LENGTH_LONG).show()
+                        } else if (isPhoneError) {
+                            android.widget.Toast.makeText(context, "Agrega un teléfono o WhatsApp de contacto.", android.widget.Toast.LENGTH_LONG).show()
+                        } else if (isAddressError) {
+                            android.widget.Toast.makeText(context, "Escribe tu dirección completa.", android.widget.Toast.LENGTH_LONG).show()
+                        } else if (isMunicipalityError) {
+                            android.widget.Toast.makeText(context, "Selecciona tu municipio de entrega.", android.widget.Toast.LENGTH_LONG).show()
+                        } else {
+                            if (isCash && cashPayWith.isBlank()) {
+                                android.widget.Toast.makeText(context, "Puedes indicar con cuánto pagarás para preparar tu cambio.", android.widget.Toast.LENGTH_LONG).show()
+                            }
+                            viewModel.checkout(onComplete = { orderId, isSynced ->
+                                if (isSynced) {
+                                    android.widget.Toast.makeText(context, "Pedido enviado correctamente.", android.widget.Toast.LENGTH_LONG).show()
+                                } else {
+                                    android.widget.Toast.makeText(context, "Pedido guardado localmente. Se sincronizará cuando haya conexión.", android.widget.Toast.LENGTH_LONG).show()
+                                }
+                                onNavigateToTracking()
+                            })
+                        }
                     }
                     .navigationBarsPadding()
                     .height(64.dp)

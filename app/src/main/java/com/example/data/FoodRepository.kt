@@ -265,6 +265,14 @@ class FoodRepository(
     suspend fun updateOrderCourierStatus(orderId: String, status: String, lat: Double, lng: Double) = withContext(Dispatchers.IO) {
         orderDao.updateOrderCourierStatus(orderId, status, lat, lng)
     }
+
+    suspend fun getUnsyncedOrders(): List<OrderEntity> = withContext(Dispatchers.IO) {
+        orderDao.getUnsyncedOrders()
+    }
+
+    suspend fun updateOrderSyncStatus(orderId: String, isSynced: Boolean) = withContext(Dispatchers.IO) {
+        orderDao.updateOrderSyncStatus(orderId, isSynced)
+    }
 }
 
 data class DeliveryDetails(

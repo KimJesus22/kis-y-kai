@@ -893,13 +893,63 @@ fun TrackingScreen(
                                 Spacer(modifier = Modifier.height(12.dp))
 
                                 // Row 3: Dirección: Address
+                                val hasBrackets = ord.address.contains("[")
+                                val cleanAddressLabel = if (hasBrackets) {
+                                    val base = ord.address.substringBefore("[").trim()
+                                    if (base.isEmpty()) "Dirección Conocida" else base
+                                } else {
+                                    ord.address
+                                }
+
+                                val parsedTipAmountOnScreenForRider = run {
+                                    try {
+                                        val pattern = "Propina:\\s*\\$(\\d+)\\s*MXN".toRegex()
+                                        val match = pattern.find(ord.address)
+                                        match?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+                                    } catch (e: Exception) {
+                                        0.0
+                                    }
+                                }
+
+                                val parsedScheduledDelayOnScreenForRider = run {
+                                    try {
+                                        val pattern = "⏰ Programado:\\s*([^|\\]]+)".toRegex()
+                                        val match = pattern.find(ord.address)
+                                        match?.groupValues?.get(1)?.trim()
+                                    } catch (e: Exception) {
+                                        null
+                                    }
+                                }
+
                                 InfoItemRow(
                                     icon = Icons.Default.LocationOn,
                                     label = "Dirección",
-                                    value = "${ord.address} (${if (ord.deliveryMethod == "RECOGER") "Pasar a recoger en Jaral del Progreso" else ord.municipality.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }})",
+                                    value = "$cleanAddressLabel (${if (ord.deliveryMethod == "RECOGER") "Pasar a recoger en Jaral del Progreso" else ord.municipality.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }})",
                                     primaryOrange = primaryOrange,
                                     darkTextColor = darkTextColor
                                 )
+
+                                if (parsedScheduledDelayOnScreenForRider != null) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    InfoItemRow(
+                                        icon = Icons.Default.Schedule,
+                                        label = "Horario",
+                                        value = "Programado ($parsedScheduledDelayOnScreenForRider)",
+                                        primaryOrange = primaryOrange,
+                                        darkTextColor = darkTextColor
+                                    )
+                                }
+
+                                if (parsedTipAmountOnScreenForRider > 0.0) {
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    InfoItemRow(
+                                        icon = Icons.Default.Payments,
+                                        label = "Propina repartidor",
+                                        value = "$${parsedTipAmountOnScreenForRider.toInt()} MXN ¡Gracias! ❤️",
+                                        primaryOrange = primaryOrange,
+                                        darkTextColor = darkTextColor
+                                    )
+                                }
 
                                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -1395,7 +1445,36 @@ fun buildWhatsAppTicket(order: OrderEntity): String {
         if (totalSum <= 0.0) 120.0 else totalSum
     }
 
-    val total = subtotal + order.deliveryFee
+    val parsedTipAmount = run {
+        try {
+            val pattern = "Propina:\\s*\\$(\\d+)\\s*MXN".toRegex()
+            val match = pattern.find(order.address)
+            match?.groupValues?.get(1)?.toDoubleOrNull() ?: 0.0
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
+    val parsedScheduledDelay = run {
+        try {
+            val pattern = "⏰ Programado:\\s*([^|\\]]+)".toRegex()
+            val match = pattern.find(order.address)
+            match?.groupValues?.get(1)?.trim()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    val finalAddressLabel = run {
+        if (order.address.contains("[")) {
+            val baseAddress = order.address.substringBefore("[").trim()
+            if (baseAddress.isEmpty()) "Dirección Conocida" else baseAddress
+        } else {
+            if (order.address.isBlank()) "No especificado" else order.address
+        }
+    }
+
+    val total = subtotal + order.deliveryFee + parsedTipAmount
 
     val parsedItems = try {
         val parts = order.itemsJson.split("; ").filter { it.isNotBlank() }
@@ -1429,7 +1508,6 @@ fun buildWhatsAppTicket(order: OrderEntity): String {
 
     val methodLabel = if (order.deliveryMethod == "RECOGER") "Recoger" else "Envío"
     val municipalityLabel = if (order.deliveryMethod == "RECOGER") "Jaral del Progreso" else order.municipality.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }
-    val addressLabel = if (order.address.isNotBlank()) order.address else "No especificado"
     val kmLabel = if (order.deliveryMethod == "RECOGER") "No aplica" else "${order.distanceKm} km"
     val timeLabel = "${order.estimatedTimeMinutes} min"
 
@@ -1454,6 +1532,19 @@ fun buildWhatsAppTicket(order: OrderEntity): String {
         "¡Hola Ulices! Estoy utilizando tu app, he realizado un pedido. Quiero que se me envíe a mi domicilio. 🛵📦"
     }
 
+    val deliveryDetailsSection = buildString {
+        append("Método: $methodLabel\n")
+        append("        Municipio: $municipalityLabel\n")
+        append("        Dirección: $finalAddressLabel\n")
+        if (parsedScheduledDelay != null) {
+            append("        Tiempo de Entrega: Programado ($parsedScheduledDelay)\n")
+        } else {
+            append("        Tiempo de Entrega: Lo antes posible (ASAP)\n")
+        }
+        append("        Distancia aprox: $kmLabel\n")
+        append("        Tiempo estimado: $timeLabel")
+    }
+
     return """
         $ulicesGreeting
 
@@ -1468,11 +1559,7 @@ fun buildWhatsAppTicket(order: OrderEntity): String {
         $parsedItems
 
         🚚 *Entrega*
-        Método: $methodLabel
-        Municipio: $municipalityLabel
-        Dirección: $addressLabel
-        Distancia aprox: $kmLabel
-        Tiempo estimado: $timeLabel
+        $deliveryDetailsSection
 
         💳 *Pago*
         Método: $payMethodLabel
@@ -1481,7 +1568,7 @@ fun buildWhatsAppTicket(order: OrderEntity): String {
         💰 *Total*
         Comida: $$${subtotal.toInt()}
         Envío: $$${order.deliveryFee.toInt()}
-        Total: $$${total.toInt()}
+        ${if (parsedTipAmount > 0.0) "Propina Repartidor: \$${parsedTipAmount.toInt()} MXN\n        " else ""}Total: $$${total.toInt()}
 
         🕒 Estado actual: $statusLabel
     """.trimIndent()

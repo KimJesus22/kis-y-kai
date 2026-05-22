@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.room.Room
 import com.example.data.*
+import com.example.data.remote.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
@@ -29,6 +30,10 @@ class FoodViewModel(
     private val repository: FoodRepository,
     private val appContext: Context
 ) : ViewModel() {
+
+    init {
+        syncPendingOrders()
+    }
 
     // Product list (static catalog)
     val products = repository.menuProducts
@@ -61,6 +66,20 @@ class FoodViewModel(
     var paymentMethod = MutableStateFlow("EFECTIVO") // "EFECTIVO" or "TRANSFERENCIA"
         private set
     var cashPayWith = MutableStateFlow("")
+        private set
+
+    // Scheduled Order states
+    var scheduledMethod = MutableStateFlow("ASAP") // "ASAP" or "LATER"
+        private set
+    var scheduledDelay = MutableStateFlow("30 min") // "30 min", "45 min", "1 hora", "1.5 horas", "2 horas"
+        private set
+    var scheduledNote = MutableStateFlow("")
+        private set
+
+    // Courier Tip states
+    var tipMethod = MutableStateFlow("NONE") // "NONE", "10", "15", "20", "CUSTOM"
+        private set
+    var customTipValue = MutableStateFlow("")
         private set
 
     // Active order being tracked
@@ -123,6 +142,13 @@ class FoodViewModel(
     fun setDeliveryAddress(v: String) { deliveryAddress.value = v }
     fun setPaymentMethod(v: String) { paymentMethod.value = v }
     fun setCashPayWith(v: String) { cashPayWith.value = v }
+
+    fun setScheduledMethod(v: String) { scheduledMethod.value = v }
+    fun setScheduledDelay(v: String) { scheduledDelay.value = v }
+    fun setScheduledNote(v: String) { scheduledNote.value = v }
+
+    fun setTipMethod(v: String) { tipMethod.value = v }
+    fun setCustomTipValue(v: String) { customTipValue.value = v }
 
     fun addNotification(title: String, text: String) {
         val formatter = java.text.SimpleDateFormat("hh:mm a", java.util.Locale.getDefault())
@@ -198,7 +224,7 @@ class FoodViewModel(
 
     private var isCheckingOut = false
 
-    fun checkout(onComplete: (String) -> Unit) {
+    fun checkout(onComplete: (String, Boolean) -> Unit) {
         if (isCheckingOut) return
         isCheckingOut = true
         viewModelScope.launch {
@@ -211,36 +237,219 @@ class FoodViewModel(
 
                 val payWith = cashPayWith.value.toDoubleOrNull() ?: 0.0
                 
+                val rawAddress = deliveryAddress.value.ifBlank { "Dirección Conocida" }
+                val schedInfo = if (scheduledMethod.value == "LATER") {
+                    val delay = scheduledDelay.value
+                    val sNote = scheduledNote.value.trim()
+                    "⏰ Programado: $delay" + (if (sNote.isNotEmpty()) " (Nota: $sNote)" else "")
+                } else null
+
+                val tipVal = when (tipMethod.value) {
+                    "10" -> 10.0
+                    "15" -> 15.0
+                    "20" -> 20.0
+                    "CUSTOM" -> customTipValue.value.toDoubleOrNull() ?: 0.0
+                    else -> 0.0
+                }
+                val tipInfo = if (tipVal > 0.0) "Propina: $${tipVal.toInt()} MXN" else null
+
+                val finalAddress = buildString {
+                    append(rawAddress)
+                    if (schedInfo != null || tipInfo != null) {
+                        append(" [")
+                        val parts = listOfNotNull(schedInfo, tipInfo)
+                        append(parts.joinToString(" | "))
+                        append("]")
+                    }
+                }
+
                 val order = repository.createOrder(
                     customerName = customerName.value.ifBlank { "Cliente Especial" },
                     phone = customerPhone.value.ifBlank { "411-XXXXXXX" },
                     deliveryMethod = deliveryMethod.value,
                     municipality = if (deliveryMethod.value == "RECOGER") "JARAL_PROGRESO" else selectedMunicipality.value,
-                    address = deliveryAddress.value.ifBlank { "Dirección Conocida" },
+                    address = finalAddress,
                     paymentMethod = paymentMethod.value,
                     cashPayWith = payWith,
                     cartItems = cartList
                 )
 
+                // Try to sync with Supabase in background
+                var isSynced = false
+                try {
+                    val supabaseItems = cartList.map { item ->
+                        SupabaseCartItemDto(
+                            productId = item.productId,
+                            productName = item.productName,
+                            price = item.price,
+                            quantity = item.quantity,
+                            sauce = item.sauce,
+                            note = item.note
+                        )
+                    }
+                    val subtotalVal = cartList.sumOf { it.price * it.quantity }
+                    val finalTotal = subtotalVal + order.deliveryFee + tipVal
+
+                    val supabaseOrder = SupabaseOrderDto(
+                        localOrderId = order.orderId,
+                        orderCode = order.orderId,
+                        customerName = order.customerName,
+                        phone = order.phone,
+                        deliveryMethod = order.deliveryMethod,
+                        municipality = order.municipality,
+                        address = order.address,
+                        paymentMethod = order.paymentMethod,
+                        cashPayWith = if (order.paymentMethod == "EFECTIVO") order.cashPayWith else null,
+                        status = order.status,
+                        itemsJson = supabaseItems,
+                        subtotal = subtotalVal,
+                        deliveryFee = order.deliveryFee,
+                        total = finalTotal,
+                        distanceKm = order.distanceKm,
+                        estimatedTimeMinutes = order.estimatedTimeMinutes,
+                        destinationLat = order.destinationLat,
+                        destinationLng = order.destinationLng,
+                        courierLat = order.currentCourierLat,
+                        courierLng = order.currentCourierLng
+                    )
+                    
+                    val dataSource = SupabaseOrderDataSource()
+                    isSynced = dataSource.uploadOrder(supabaseOrder)
+                    if (isSynced) {
+                        repository.updateOrderSyncStatus(order.orderId, true)
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+
                 activeOrderId.value = order.orderId
                 
-                // Push Notification
+                // Push Notification with sync state indication
                 addNotification(
-                    title = "Pedido Recibido 📝",
-                    text = "¡Alitas Kis y Kei ha recibido tu orden ${order.orderId}! Iniciamos la preparación."
+                    title = if (isSynced) "Pedido Recibido ✨" else "Pedido Recibido 📝",
+                    text = if (isSynced) {
+                        "¡Alitas Kis y Kei ha recibido tu orden ${order.orderId}! Sincronizado online."
+                    } else {
+                        "¡Alitas Kis y Kei ha recibido tu orden ${order.orderId}! Se sincronizará al recuperar conexión."
+                    }
                 )
 
-                // Clear Cart
+                // Clear Cart and reset checkout/tip states
                 repository.clearCart()
+                tipMethod.value = "NONE"
+                customTipValue.value = ""
+                scheduledMethod.value = "ASAP"
+                scheduledNote.value = ""
 
                 // Start life cycle simulation
                 startTrackingSimulation(order.orderId)
 
                 withContext(Dispatchers.Main) {
-                    onComplete(order.orderId)
+                    onComplete(order.orderId, isSynced)
                 }
             } finally {
                 isCheckingOut = false
+            }
+        }
+    }
+
+    fun parseItemsJsonString(itemsString: String): List<SupabaseCartItemDto> {
+        if (itemsString.isBlank()) return emptyList()
+        return itemsString.split("; ").map { part ->
+            try {
+                val sauceStart = part.indexOf("[")
+                val sauceEnd = part.indexOf("]")
+                val name = if (sauceStart != -1) part.substring(0, sauceStart).trim() else part.trim()
+                val sauce = if (sauceStart != -1 && sauceEnd != -1) part.substring(sauceStart + 1, sauceEnd).trim() else "BBQ"
+                
+                val qtyStart = part.indexOf("(x")
+                val qtyEnd = part.indexOf(")")
+                val qty = if (qtyStart != -1 && qtyEnd != -1) {
+                    part.substring(qtyStart + 2, qtyEnd).trim().toIntOrNull() ?: 1
+                } else 1
+                
+                val priceStart = part.indexOf("$")
+                val price = if (priceStart != -1) {
+                    part.substring(priceStart + 1).trim().toDoubleOrNull() ?: 0.0
+                } else 0.0
+
+                SupabaseCartItemDto(
+                    productId = "legacy",
+                    productName = name,
+                    price = if (qty > 0) price / qty else price,
+                    quantity = qty,
+                    sauce = sauce,
+                    note = ""
+                )
+            } catch (e: Exception) {
+                SupabaseCartItemDto(
+                    productId = "parsing_error",
+                    productName = part,
+                    price = 0.0,
+                    quantity = 1,
+                    sauce = "",
+                    note = ""
+                )
+            }
+        }
+    }
+
+    private fun OrderEntity.toSupabaseOrderDto(): SupabaseOrderDto {
+        val itemsList = parseItemsJsonString(this.itemsJson)
+        val subtotalVal = itemsList.sumOf { it.price * it.quantity }
+        val computedTotal = subtotalVal + this.deliveryFee
+        
+        return SupabaseOrderDto(
+            localOrderId = this.orderId,
+            orderCode = this.orderId,
+            customerName = this.customerName,
+            phone = this.phone,
+            deliveryMethod = this.deliveryMethod,
+            municipality = this.municipality,
+            address = this.address,
+            paymentMethod = this.paymentMethod,
+            cashPayWith = if (this.paymentMethod == "EFECTIVO") this.cashPayWith else null,
+            status = this.status,
+            itemsJson = itemsList,
+            subtotal = subtotalVal,
+            deliveryFee = this.deliveryFee,
+            total = computedTotal,
+            distanceKm = this.distanceKm,
+            estimatedTimeMinutes = this.estimatedTimeMinutes,
+            destinationLat = this.destinationLat,
+            destinationLng = this.destinationLng,
+            courierLat = this.currentCourierLat,
+            courierLng = this.currentCourierLng
+        )
+    }
+
+    var isSyncingPending = MutableStateFlow(false)
+        private set
+
+    fun syncPendingOrders() {
+        if (isSyncingPending.value) return
+        viewModelScope.launch {
+            isSyncingPending.value = true
+            try {
+                val unsyncedList = repository.getUnsyncedOrders()
+                if (unsyncedList.isNotEmpty()) {
+                    val dataSource = SupabaseOrderDataSource()
+                    for (order in unsyncedList) {
+                        try {
+                            val dto = order.toSupabaseOrderDto()
+                            val success = dataSource.uploadOrder(dto)
+                            if (success) {
+                                repository.updateOrderSyncStatus(order.orderId, true)
+                            }
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                isSyncingPending.value = false
             }
         }
     }

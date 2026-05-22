@@ -37,7 +37,8 @@ data class OrderEntity(
     val currentCourierLat: Double,
     val currentCourierLng: Double,
     val destinationLat: Double,
-    val destinationLng: Double
+    val destinationLng: Double,
+    val isSynced: Boolean = false
 )
 
 // ----------------------------------------------------
@@ -81,13 +82,19 @@ interface OrderDao {
 
     @Query("UPDATE orders SET status = :status, currentCourierLat = :lat, currentCourierLng = :lng WHERE orderId = :orderId")
     suspend fun updateOrderCourierStatus(orderId: String, status: String, lat: Double, lng: Double)
+
+    @Query("SELECT * FROM orders WHERE isSynced = 0")
+    suspend fun getUnsyncedOrders(): List<OrderEntity>
+
+    @Query("UPDATE orders SET isSynced = :isSynced WHERE orderId = :orderId")
+    suspend fun updateOrderSyncStatus(orderId: String, isSynced: Boolean)
 }
 
 // ----------------------------------------------------
 // CONVERTER OR HELPER
 // ----------------------------------------------------
 
-@Database(entities = [CartItemEntity::class, OrderEntity::class], version = 1, exportSchema = false)
+@Database(entities = [CartItemEntity::class, OrderEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun cartDao(): CartDao
     abstract fun orderDao(): OrderDao
